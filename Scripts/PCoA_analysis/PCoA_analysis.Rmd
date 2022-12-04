@@ -1,0 +1,123 @@
+---
+title: 'Microbiome analysis'
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 4
+  pdf_document: default
+date: "18/10/2022"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=10, fig.height=6, out.width='100%', out.height='100%', fig.align='center')
+```
+
+```{r}
+# Load libraries
+library(vegan)
+library(ape)
+library(robCompositions)
+library(readr)
+library(RColorBrewer)
+library(ggpubr)
+library(grid)
+```
+
+```{r}
+# Reading and processing of the data
+data <- as.matrix(read.delim("mOTUs.all.samples.tsv",row.names=1))
+colnames(data) <- gsub("id","ID", colnames(data)) 
+
+# Isolate the species of interest
+v1 <- data[grep("s__Bifidobacterium longum", rownames(data)), ]
+v2 <- data[grep("s__Bacteroides dorei/vulgatus", rownames(data)), ]
+v3 <- data[grep("s__Escherichia coli", rownames(data)), ]
+
+# Put these into a data frame
+is.data <- data.frame(v1,v2,v3)
+
+# Get color palletes
+v <- viridis::viridis(n=366, direction = -1)
+
+```
+
+```{r}
+## Creating the datasets for each sample ##
+data_1 <- is.data[grep("ID1_", rownames(is.data)),]
+data_2 <- is.data[grep("ID2_", rownames(is.data)),]
+data_3 <- is.data[grep("ID3_", rownames(is.data)),]
+data_4 <- is.data[grep("ID4_", rownames(is.data)),]
+data_5 <- is.data[grep("ID5_", rownames(is.data)),]
+data_6 <- is.data[grep("ID6_", rownames(is.data)),]
+data_7 <- is.data[grep("ID7_", rownames(is.data)),]
+data_8 <- is.data[grep("ID8_", rownames(is.data)),]
+data_9 <- is.data[grep("ID9_", rownames(is.data)),]
+data_10 <- is.data[grep("ID10_", rownames(is.data)),]
+data_11 <- is.data[grep("ID11_", rownames(is.data)),]
+data_12 <- is.data[grep("ID12_", rownames(is.data)),]
+```
+
+
+```{r}
+## Processing the data
+
+preprocessing_f <- function(data_input) {
+  df <- as.data.frame(x = row.names(data_input))
+  
+  # Replace the id with ID in the samples column
+  df$factor_names <- gsub("id","ID", df$`row.names(data_input)`)
+  
+  # Also make a new column with the sample ID as factor
+  df$factor_names <- gsub(".d.*","", df$factor_names)
+  df$factor_names <- as.factor(df$factor_names)
+  
+  # Replace the sample names with corresponding day
+  df$Day <- gsub("id","ID", df$`row.names(data_input)`)
+  df$Day <- gsub("ID.*d","", df$Day)
+  df$Day <- gsub(".s.*","", df$Day)
+  df$Day <- as.numeric(df$Day)
+  
+  # Convert to matrix
+  data_input <- as.matrix(data_input)
+  
+  # Calculate the Bray-Curtis-dissimilarity matrix. It will be used for the next step.
+  bc1 <- vegdist(data_input)
+  
+  # Performing PCoA
+  pcoa1 <- pcoa(bc1)
+  pcoa_val1 <- 100*c(pcoa1$values[pcoa1$values[,2]>0,2]/sum(pcoa1$values[pcoa1$values[,2]>0,2]))
+
+  ggplot(pcoa1$vectors, mapping = aes(x = pcoa1$vector[,1], y = pcoa1$vector[,2])) + geom_point(col=v[df$Day]) + xlab("PC1") + ylab("PC2")
+}
+  
+
+data_6 <- data_6[-c(8,16,18),]
+
+# Calling the functions
+p1 <- preprocessing_f(data_1)
+p2 <- preprocessing_f(data_2)
+p3 <- preprocessing_f(data_3)
+p4 <- preprocessing_f(data_4)
+p5 <- preprocessing_f(data_5)
+p6 <- preprocessing_f(data_6)
+p7 <- preprocessing_f(data_7)
+p8 <- preprocessing_f(data_8)
+p9 <- preprocessing_f(data_9)
+p10 <- preprocessing_f(data_10)
+p11 <- preprocessing_f(data_11)
+p12 <- preprocessing_f(data_12)
+
+# Make a list of the plots
+plot.list <- list(p1, p2 , p3, p4, p5, p6, p7, p8, p9, p10, p11, p12)
+
+
+figure.1 <- ggarrange(plotlist = plot.list, 
+                      ncol = 4, nrow = 3, align = "hv", common.legend = FALSE, legend = "bottom", 
+                      labels = NULL, 
+                      font.label = list(size = 10, color = "black", face = "bold", family = NULL, position = "top"))
+
+figure.1
+
+```
