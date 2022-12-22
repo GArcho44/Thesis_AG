@@ -29,9 +29,9 @@ gatk Mutect2 --af-of-alleles-not-in-resource 0.33\
 gzip -d mutect2.variants.vcf.gz
 
 # Filter the raw mutect2 vcf file
-Rscript SNPs_filtering
+Rscript SNPs_filtering.R
 
 # Remove the temporary file "mutect2.filtered.tmp"
-rm mutect2.filtered.tmp
+rm mutect2.filtered.tmp.vcf
 
 # This is the end of script
