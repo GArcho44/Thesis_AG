@@ -187,6 +187,3 @@ figure.1 <- ggarrange(plotlist = plot.list,
 # Annotate figure
 annotate_figure(figure.1, left = textGrob("Bacterial species", rot = 90, vjust = 1, gp = gpar(cex = 1.8)), bottom = textGrob("Days since birth", gp = gpar(cex = 1.8)))
 ```
-
-
-
