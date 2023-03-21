@@ -34,14 +34,7 @@ library(dplyr)
 
 
 ```{r}
-## Read ##
-# Read the data from the .tsv files and store them into a list
-
-# Get the names and store them into a list
-# file.list <- list.files(pattern = '*merged.tsv', recursive = TRUE)
-# Use the above list to read the corresponding tsv files
-# id.list <- lapply(file.list, read_tsv)
-
+## Read the data ##
 data <- read_tsv('data/mOTUs.all.samples.tsv', show_col_types = FALSE)
 ```
 
@@ -115,24 +108,21 @@ data$Samples <- as.numeric(data$Samples)
 ```{r}
 # Write the cut-off filtered data
 write.xlsx(cut_off_filtered, file = "data/Selected_samples.xlsx", rowNames=TRUE)
+
+# Write the rest of the data for later use
+write.xlsx(data, file = "data/abundance_data.xlsx", rowNames=TRUE)
 ```
 
 ```{r}
 # Get full reports for each id
 # I can do this with a for loop
 
-full_report1 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID1")
-full_report2 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID2")
-full_report3 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID3")
-full_report4 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID4")
-full_report5 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID5")
-full_report6 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID6")
-full_report7 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID7")
-full_report8 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID8")
-full_report9 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID9")
-full_report10 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID10")
-full_report11 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID11")
-full_report12 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID12")
+for (i in 1:12) {
+  var_name <- paste("full_report", i, sep="")
+  report <- data %>% group_by(Sample.ID) %>% filter(Sample.ID==paste("ID", i, sep=""))
+  assign(var_name,report)
+}
+
 ```
 
 ```{r}
@@ -141,12 +131,12 @@ full_report12 <- data %>% group_by(Sample.ID) %>% filter(Sample.ID=="ID12")
 # Plotting functions
   
 pfunc.1 = function(data, x, y, s, col_var, color_vec, t, drop=TRUE) {
-    ggplot(data, aes_string(x, y, size = s, col = col_var)) +  geom_point(alpha = 0.8, show.legend = FALSE) +   scale_size_continuous(limits=c(0,18000),breaks=seq(0, 18000, 1000),range=c(0,40)) + scale_colour_manual(values=color_vec, drop=drop) + theme(axis.text.x = element_text(size=20, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_text(size=20), plot.margin=unit(c(3,0.1,3,0.1), 'cm')) + rremove("xlab") + rremove("ylab") + labs(title = t)
+    ggplot(data, aes_string(x, y, size = s, col = col_var)) +  geom_point(alpha = 0.8, show.legend = TRUE) +   scale_size_continuous(limits=c(0,18000),breaks=seq(0, 18000, 1000),range=c(0,40)) + scale_colour_manual(values=color_vec, drop=drop) + theme(axis.text.x = element_text(size=20, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_text(size=20), plot.margin=unit(c(3,0.1,3,0.1), 'cm')) + rremove("xlab") + rremove("ylab") + labs(title = t)
     
   }
   
 pfunc.2 = function(data, x, y, s, col_var, color_vec, t, drop=TRUE) {
-    ggplot(data, aes_string(x, y, size = s, col = col_var)) +  geom_point(alpha = 0.8, show.legend = FALSE) +   scale_size_continuous(limits=c(0,18000),breaks=seq(0, 18000, 1000),range=c(0,40)) + scale_colour_manual(values=color_vec, drop=drop) + theme(axis.text.x = element_text(size=20, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_blank(), plot.margin=unit(c(3,0.01,3,0.01), 'cm')) + rremove("xlab") + rremove("ylab") + labs(title = t)
+    ggplot(data, aes_string(x, y, size = s, col = col_var)) +  geom_point(alpha = 0.8, show.legend = TRUE) +   scale_size_continuous(limits=c(0,18000),breaks=seq(0, 18000, 1000),range=c(0,40)) + scale_colour_manual(values=color_vec, drop=drop) + theme(axis.text.x = element_text(size=20, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_blank(), plot.margin=unit(c(3,0.01,3,0.01), 'cm')) + rremove("xlab") + rremove("ylab") + labs(title = t)
     
   }
 
@@ -169,7 +159,6 @@ col <- setNames(v, levels(factor(df$bac_counts)))
 
   
 # Calling the function for plotting
-
 p1 <- pfunc.1(full_report1,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID1")
 p2 <- pfunc.2(full_report2,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID2")
 p3 <- pfunc.2(full_report3,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID3")
@@ -189,14 +178,15 @@ plot.list <- list(p1, p2 , p3 , p4, p5, p6, p7, p8, p9, p10, p11, p12)
 
 # Make the multiple plot figure
 figure.1 <- ggarrange(plotlist = plot.list, 
-                      ncol = 4, nrow = 3, align = "hv", common.legend = FALSE, legend = "bottom", 
+                      ncol = 4, nrow = 3, align = "hv", common.legend = TRUE, legend = FALSE, 
                       labels = NULL, 
                       font.label = list(size = 10, color = "black", face = "bold", family = NULL, position = "top"))
 
-figure.1
-# Annotate figure
-# annotate_figure(figure.1, left = textGrob("Bacterial species", rot = 90, vjust = 1, gp = gpar(cex = 3)), bottom = textGrob("Days since birth", gp = gpar(cex = 1.3)))
+# figure.1
 
+# Annotate figure
+annotate_figure(figure.1, left = textGrob("Bacterial species", rot = 90, vjust = 1, gp = gpar(cex = 1.8)), bottom = textGrob("Days since birth", gp = gpar(cex = 1.8)))
 ```
+
 
 
