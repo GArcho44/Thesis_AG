@@ -3,29 +3,29 @@
 
 ### Abstract 
 
-In this study, we explore the intricate dynamics of microbial succession within the infant gut microbiome during the first year
-of life, utilizing High-Resolution Metagenomics (HRM) to elucidate the adaptability and persistence of crucial microbial strains.
-Specifically, we focus on three pivotal species for infant gut development: Bifidobacterium longum, Phocaeicola (formely Bacteroides)
+In this study, we explore the intricate dynamics of microbial succession within the infant gut microbiome during the first year
+of life, utilizing High-Resolution Metagenomics (HRM) to elucidate the adaptability and persistence of crucial microbial strains.
+Specifically, we focus on three pivotal species for infant gut development: Bifidobacterium longum, Phocaeicola (formely Bacteroides)
 dorei/vulgatus, and Escherichia coli, asking whether and how these
 strains adapt to the conditions of the infant gut, and whether this
 adaptation continues throughout the important changes of the
 early-life period. We analyze shotgun metagenomics sequencing
-data from 306 samples collected from a densely sampled first-yearof-life cohort comprising 12 infants. We first employ the IMP3
+data from 306 samples collected from a densely sampled first-year-of-life cohort comprising 12 infants. We first employ the IMP3
 pipeline for sample selection based on taxonomic profiling, followed
 by assemblies retrieval, functional annotations, and reconstructed
-genomes. We validate three different SNP-calling tools under various real-case scenarios and Mutect2, outperforming the others
+genomes. We validate three different SNP-calling tools under various real-case scenarios and Mutect2, outperforming the others
 in sensitivity, is deployed with de novo-reconstructed genomes
 to develop an optimized HRM SNP calling workflow subsequently
-applied to the data. Our results uncover intriguing dynamics, including a decline in E. coli abundance over time for half of the infants,
+applied to the data. Our results uncover intriguing dynamics, including a decline in E. coli abundance over time for half of the infants,
 increasing and stable trends in P. dorei dorei/vulgatus, and distinct
-patterns in B. longum abundance correlating with the introduction of solid food. SNP-level analysis within and between samples
+patterns in B. longum abundance correlating with the introduction of solid food. SNP-level analysis within and between samples
 highlights mutations in these species, along with temporal strain
 replacement events. Lastly, potential functional consequences of
 these changes are assessed and reveal that genes associated with
-multi-drug resistance being affected. Additionally, the comparison between reference genome-based (MIDAS2) and metagenomeassembled genome-based (Mutect2) SNP calling methods underscores Mutect2’s advantages in detecting within-sample SNPs. By
+multi-drug resistance being affected. Additionally, the comparison between reference genome-based (MIDAS2) and metagenome-assembled genome-based (Mutect2) SNP calling methods underscores Mutect2’s advantages in detecting within-sample SNPs. By
 addressing metagenotyping challenges and opening the path to
 Ultra-Resolution Metagenomics (URM), this study contributes to a
-deeper understanding of microbial community evolution and development during this critical period, with implications for long-term
+deeper understanding of microbial community evolution and development during this critical period, with implications for long-term
 health.
 
 ### Information
