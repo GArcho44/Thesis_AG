@@ -1,0 +1,491 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=10, fig.height=8, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library("Biostrings")
+library(ape)
+library(readr)
+library(readxl)
+library(RColorBrewer)
+library(stringr)
+library(viridis)
+library(scales)
+library(cowplot)
+library(colourvalues)
+```
+
+```{r}
+## Read the data ##
+
+# E. coli
+e.coli.cog <- read.csv("../data/E.coli/E.coli_COG_norm.csv", row.names = 1)
+e.coli.kegg <- read.csv("../data/E.coli/E.coli_KEGG_norm.csv", row.names = 1)
+
+# B. longum
+b.longum.cog <- read.csv("../data/B.longum/b.longum_COG_norm.csv", row.names = 1)
+b.longum.kegg <- read.csv("../data/B.longum/b.longum_KEGG_norm.csv", row.names = 1)
+
+# P. dorei
+p.dorei.cog <- read.csv("../data/P.dorei/P.dorei_COG_norm.csv", row.names = 1)
+p.dorei.kegg <- read.csv("../data/P.dorei/P.dorei_KEGG_norm.csv", row.names = 1)
+
+```
+
+```{r}
+# Process the data before the heatmap
+
+# Make a column that contain the row names (to be used to filter significant variables)
+#e.coli.cog$row_names  <- rownames(e.coli.cog)
+
+# Select only significant COG terms
+#e.coli.cog.new <- e.coli.cog %>% filter(row_names %in% rownames(p.values.sig)) %>% select(-row_names)
+```
+
+```{r}
+## E.coli ##
+## Hierarchical clustering (heatmap function)
+
+# Create matrix to visualize 
+x.cog <- as.matrix(e.coli.cog)
+x.kegg <- as.matrix(e.coli.kegg)
+
+# Define color palette based on days (timepoint)
+timepoints <- gsub(".*_d","", colnames(e.coli.cog)) %>% as.numeric()
+individuals <- gsub("_d.*","",colnames(e.coli.cog))
+individuals
+color_palette <- c(rep("#fde725",8),rep("#84d44b",4),rep("#28ae80",4),rep("#26828e",5), rep("#375b8d",6), rep("#482374",3),rep("#c2df23",4), rep("#33638d",10), rep("#4cc26c",6),  rep("#1f9e89",4), rep("#433e85",8))
+
+# A) Make a heatmap for COG
+p1 <- heatmap(x.cog, col = colorRampPalette(c("black", "green", "red"))(100), scale = "column", cexCol = 0.6, cexRow = 0.6, ColSideColors = color_palette, distfun = function(x) dist(x,method = 'manhattan'), hclustfun = function(x) hclust(x, method = "complete"))
+
+# B) Make a heatmap for KEGG
+p2 <- heatmap(x.kegg, col = colorRampPalette(c("black", "green", "red"))(100), scale = "column", cexCol = 0.6, ColSideColors = color_palette, distfun = function(x) dist(x,method = 'manhattan'))
+
+```
+
+```{r}
+## B.longum ##
+## Hierarchical clustering (heatmap function)
+
+# Create matrix to visualize 
+x.cog <- as.matrix(b.longum.cog)
+x.kegg <- as.matrix(b.longum.kegg)
+
+# Define color palette based on days (timepoint)
+timepoints <- gsub(".*_d","", colnames(b.longum.cog)) %>% as.numeric()
+individuals <- gsub("_d.*","",colnames(b.longum.kegg))
+individuals 
+color_palette <- c(rep("#28ae80",9), rep("#375b8d",9), rep("#c2df23",5), rep("#33638d",8), rep("#29794e",4), rep("#4cc26c",5), rep("#1f9e89",6),  rep("#433e85",15))
+
+# A) Make a heatmap for COG
+p3 <- heatmap(x.cog, col = colorRampPalette(c("black", "green", "red"))(100), scale = "column", cexCol = 0.6, cexRow = 0.6, ColSideColors = color_palette, distfun = function(x) dist(x,method = 'manhattan'), hclustfun = function(x) hclust(x, method = "complete"))
+
+# B) Make a heatmap for KEGG
+p4 <- heatmap(x.kegg, col = colorRampPalette(c("black", "green", "red"))(100), scale = "column", cexCol = 0.6, ColSideColors = color_palette, distfun = function(x) dist(x,method = 'manhattan'))
+
+```
+
+```{r}
+## P.dorei ##
+## Hierarchical clustering (heatmap function)
+
+# Create matrix to visualize 
+x.cog <- as.matrix(p.dorei.cog)
+x.kegg <- as.matrix(p.dorei.kegg)
+
+# Define color palette based on days (timepoint)
+timepoints <- gsub(".*_d","", colnames(p.dorei.cog)) %>% as.numeric()
+individuals <- gsub("_d.*","",colnames(p.dorei.kegg))
+individuals
+color_palette <- c(rep("#fde725",9), rep("#26828e",8), rep("#375b8d",14),  rep("#33638d",15), rep("#4cc26c",8), rep("#433e85",12))
+
+# A) Make a heatmap for COG
+p5 <- heatmap(x.cog, col = colorRampPalette(c("black", "green", "red"))(100), scale = "column", cexCol = 0.6, cexRow = 0.6, ColSideColors = color_palette, distfun = function(x) dist(x,method = 'manhattan'), hclustfun = function(x) hclust(x, method = "complete"))
+
+# B) Make a heatmap for KEGG
+p6 <- heatmap(x.kegg, col = colorRampPalette(c("black", "green", "red"))(100), scale = "column", cexCol = 0.6, ColSideColors = color_palette, distfun = function(x) dist(x,method = 'manhattan'))
+
+```
+
+```{r}
+## E.coli, KEGG ##
+## Perform PCA ##
+
+# Process the data
+x_kegg <- as.matrix(t(e.coli.kegg))
+
+# scale data
+scaled_data_kegg <- scale(x_kegg, center=TRUE, scale=TRUE)
+scaled_data_kegg[is.na(scaled_data_kegg)] <- 0
+
+# Insert a colour pallete
+my_palette <- c("#fde725","#84d44b","#28ae80","#26828e","#375b8d","#482374","#c2df23","#33638d","#4cc26c","#1f9e89","#433e85")
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data_kegg*scaled_data_kegg) # calculates the sum of squares
+USV <- svd(scaled_data_kegg)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- gsub(".*_d","", colnames(e.coli.kegg)) %>% as.numeric()
+PCA_scores$ID <- gsub("_d.*","", colnames(e.coli.kegg)) 
+
+# Create a plot using ggplot
+p1 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2,col=ID)) + 
+  geom_point() + 
+  xlab("PC1 (13.58%)") + 
+  ylab("PC2 (3.52%)") + 
+  ggtitle("PCA analysis") + 
+  scale_color_manual(values = my_palette) + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+p1
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- rownames(e.coli.kegg)[top_10_rows]
+row_nameS
+
+
+```
+
+```{r}
+## E.coli, COG ##
+## Perform PCA ##
+
+# Process the data
+x_cog <- as.matrix(t(e.coli.cog))
+
+# scale data
+scaled_data_cog <- scale(x_cog, center=TRUE, scale=TRUE)
+scaled_data_cog[is.na(scaled_data_cog)] <- 0
+
+# Insert a colour pallete
+my_palette <- c("#fde725","#84d44b","#28ae80","#26828e","#375b8d","#482374","#c2df23","#33638d","#4cc26c","#1f9e89","#433e85")
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data_cog*scaled_data_cog) # calculates the sum of squares
+USV <- svd(scaled_data_cog)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- gsub(".*_d","", colnames(e.coli.cog)) %>% as.numeric()
+PCA_scores$ID <- gsub("_d.*","", colnames(e.coli.cog)) 
+
+# Create a plot using ggplot
+p2 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2,col=ID)) + 
+  geom_point() + 
+  xlab("PC1 (12.11%)") + 
+  ylab("PC2 (3.83%)") + 
+  ggtitle("PCA analysis") + 
+  scale_color_manual(values = my_palette) + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- rownames(e.coli.kegg)[top_10_rows]
+row_nameS
+p2
+
+```
+
+```{r}
+## B. longum, KEGG ##
+## Perform PCA ##
+
+# Process the data
+x_kegg <- as.matrix(t(b.longum.kegg))
+
+# scale data
+scaled_data_kegg <- scale(x_kegg, center=TRUE, scale=TRUE)
+scaled_data_kegg[is.na(scaled_data_kegg)] <- 0
+
+# Insert a colour pallete
+my_palette <- c("#fde725","#84d44b","#28ae80","#26828e","#375b8d","#482374","#c2df23","#33638d","#4cc26c","#1f9e89","#433e85")
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data_kegg*scaled_data_kegg) # calculates the sum of squares
+USV <- svd(scaled_data_kegg)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- gsub(".*_d","", colnames(b.longum.kegg)) %>% as.numeric()
+PCA_scores$ID <- gsub("_d.*","", colnames(b.longum.kegg)) 
+
+# Create a plot using ggplot
+p3 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2,col=ID)) + 
+  geom_point() + 
+  xlab("PC1 (11.02%)") + 
+  ylab("PC2 (4.74%)") + 
+  ggtitle("PCA analysis") + 
+  scale_color_manual(values = my_palette) + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- rownames(e.coli.kegg)[top_10_rows]
+row_nameS
+
+p3
+
+```
+
+```{r}
+## B.longum, COG ##
+## Perform PCA ##
+
+# Process the data
+x_cog <- as.matrix(t(b.longum.cog))
+
+# scale data
+scaled_data_cog <- scale(x_cog, center=TRUE, scale=TRUE)
+scaled_data_cog[is.na(scaled_data_cog)] <- 0
+
+# Insert a colour pallete
+my_palette <- c("#fde725","#84d44b","#28ae80","#26828e","#375b8d","#482374","#c2df23","#33638d","#4cc26c","#1f9e89","#433e85")
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data_cog*scaled_data_cog) # calculates the sum of squares
+USV <- svd(scaled_data_cog)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- gsub(".*_d","", colnames(b.longum.cog)) %>% as.numeric()
+PCA_scores$ID <- gsub("_d.*","", colnames(b.longum.cog)) 
+
+# Create a plot using ggplot
+p4 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2,col=ID)) + 
+  geom_point() + 
+  xlab("PC1 (10.62%)") + 
+  ylab("PC2 (4.64%)") + 
+  ggtitle("PCA analysis") + 
+  scale_color_manual(values = my_palette) + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- rownames(e.coli.kegg)[top_10_rows]
+row_nameS
+p4
+
+```
+
+```{r}
+## P. dorei, KEGG ##
+## Perform PCA ##
+
+# Process the data
+x_kegg <- as.matrix(t(p.dorei.kegg))
+
+# scale data
+scaled_data_kegg <- scale(x_kegg, center=TRUE, scale=TRUE)
+scaled_data_kegg[is.na(scaled_data_kegg)] <- 0
+
+# Insert a colour pallete
+my_palette <- c("#fde725","#84d44b","#28ae80","#26828e","#375b8d","#482374","#c2df23","#33638d","#4cc26c","#1f9e89","#433e85")
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data_kegg*scaled_data_kegg) # calculates the sum of squares
+USV <- svd(scaled_data_kegg)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- gsub(".*_d","", colnames(p.dorei.kegg)) %>% as.numeric()
+PCA_scores$ID <- gsub("_d.*","", colnames(p.dorei.kegg)) 
+
+# Create a plot using ggplot
+p5 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2,col=ID)) + 
+  geom_point() + 
+  xlab("PC1 (19.92%)") + 
+  ylab("PC2 (4.01%)") + 
+  ggtitle("PCA analysis") + 
+  scale_color_manual(values = my_palette) + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- rownames(e.coli.kegg)[top_10_rows]
+row_nameS
+
+p5
+
+```
+
+```{r}
+## P.dorei, COG ##
+## Perform PCA ##
+
+# Process the data
+x_cog <- as.matrix(t(p.dorei.cog))
+
+# scale data
+scaled_data_cog <- scale(x_cog, center=TRUE, scale=TRUE)
+scaled_data_cog[is.na(scaled_data_cog)] <- 0
+
+# Insert a colour pallete
+my_palette <- c("#fde725","#84d44b","#28ae80","#26828e","#375b8d","#482374","#c2df23","#33638d","#4cc26c","#1f9e89","#433e85")
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data_cog*scaled_data_cog) # calculates the sum of squares
+USV <- svd(scaled_data_cog)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- gsub(".*_d","", colnames(p.dorei.cog)) %>% as.numeric()
+PCA_scores$ID <- gsub("_d.*","", colnames(p.dorei.cog)) 
+
+# Create a plot using ggplot
+p6 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2,col=ID)) + 
+  geom_point() + 
+  xlab("PC1 (19.81%)") + 
+  ylab("PC2 (4.04%)") + 
+  ggtitle("PCA analysis") + 
+  scale_color_manual(values = my_palette) + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- rownames(e.coli.kegg)[top_10_rows]
+row_nameS
+p6
+
+```
+
+```{r}
+# Create & save the final (COG) plot as tiff image
+
+tiff("PCA_results.tiff", units="in", width=20, height=6, res=300)
+
+plot_grid(p2,p4,p6, nrow=1, labels = c("A","B","C"))
+
+dev.off()
+```
+```{r}
+# Create & save the final (KEGG) plot as tiff image
+
+tiff("PCA_sup.tiff", units="in", width=20, height=6, res=300)
+
+plot_grid(p1,p3,p5, nrow=1, labels = c("A","B","C"))
+
+dev.off()
+```
