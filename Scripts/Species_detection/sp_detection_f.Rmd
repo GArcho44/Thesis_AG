@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(fig.width=40, fig.height=25, out.width='100%', out.height='100%', fig.align='center')
+knitr::opts_chunk$set(fig.width=48, fig.height=25, out.width='100%', out.height='100%', fig.align='center')
 ```
 
 ```{r}
@@ -26,12 +26,13 @@ library(ggplot2)
 library(ggpubr)
 library(grid)
 library(RColorBrewer)
+library(patchwork)
+library(cowplot)
 
 # For processing
 library(tidyr)
 library(dplyr)
 ```
-
 
 ```{r}
 ## Read the data ##
@@ -58,11 +59,21 @@ detection2 <- data[grep('s__Bacteroides dorei/vulgatus', data$Bacterial_species)
 # Detection of E. coli
 detection3 <- data[grep('s__Escherichia coli', data$Bacterial_species), ] %>% mutate(Bacterial_species="Escherichia coli")
 
+# Take the total number of reads mapped to bacteria per sample
+total <- data[data$Bacterial_species == 'k__Bacteria', ] %>% as.numeric()
 
 # Make a summary of the data
 n <- length(data)
-data <- full_join(detection1,detection2,by=colnames(detection1)) %>% full_join(detection3, by=colnames(detection1)) %>% pivot_longer(cols=2:all_of(n), names_to = 'Samples', values_to = 'Counts')
-  
+data <- full_join(detection1,detection2,by=colnames(detection1)) %>% 
+  full_join(detection3, by=colnames(detection1))
+
+data <- sweep(data[,-1],2,total[-1],FUN="/") %>% 
+  mutate(across(everything(), ~ . * 10000)) %>% 
+  mutate(Bacterial_species= c("Bifidobacterium longum", "Phocaeicola dorei/vulgatus", "Escherichia coli")) %>% 
+  pivot_longer(cols=1:306, names_to = 'Samples', values_to = 'Counts')
+
+min(data$Counts)
+
 ## Filter the samples based on the cut_off of reads: N = 1018 (reads per sample) ##
   
 # Make another table of the data
@@ -80,10 +91,10 @@ cut_off_filtered[is.na(cut_off_filtered)] <- 0
   
 # Filter the samples
 cut_off_filtered <- cut_off_filtered %>% filter(`Bifidobacterium longum`>= 1018 | `Escherichia coli` >= 1018 | `Bacteroides dorei/vulgatus` >= 1018)
+
   
 ## <--> ##
 ```
-
 
 ```{r}
 # Make a factor variable from the continues counts variable
@@ -104,7 +115,6 @@ data$Samples <- gsub(".s.*","", data$Samples)
 data$Samples <- as.numeric(data$Samples)
 ```
 
-
 ```{r}
 # Write the cut-off filtered data
 write.xlsx(cut_off_filtered, file = "data/Selected_samples.xlsx", rowNames=TRUE)
@@ -120,7 +130,16 @@ write.xlsx(data, file = "data/abundance_data.xlsx", rowNames=TRUE)
 for (i in 1:12) {
   var_name <- paste("full_report", i, sep="")
   report <- data %>% group_by(Sample.ID) %>% filter(Sample.ID==paste("ID", i, sep=""))
+  report$Bacterial_species <- as.factor(report$Bacterial_species)
+  order <- c("Phocaeicola dorei/vulgatus", "Bifidobacterium longum", "Escherichia coli")
+  report$Bacterial_species <- factor(report$Bacterial_species, levels = order)
+  # Order the dataframe based on the custom order
+  report <- report[order(report$Bacterial_species), ]
+  report$Color <- factor(report$Bacterial_species,
+                     levels = c("Escherichia coli", "Bifidobacterium longum", "Phocaeicola dorei/vulgatus"),
+                     labels = viridis::viridis(3))
   assign(var_name,report)
+
 }
 
 ```
@@ -130,13 +149,28 @@ for (i in 1:12) {
 
 # Plotting functions
   
-pfunc.1 = function(data, x, y, s, col_var, color_vec, t, drop=TRUE) {
-    ggplot(data, aes_string(x, y, size = s, col = col_var)) +  geom_point(alpha = 0.8, show.legend = TRUE) +   scale_size_continuous(limits=c(0,18000),breaks=seq(0, 18000, 1000),range=c(0,40)) + scale_colour_manual(values=color_vec, drop=drop) + theme(axis.text.x = element_text(size=20, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_text(size=20), plot.margin=unit(c(3,0.1,3,0.1), 'cm')) + rremove("xlab") + rremove("ylab") + labs(title = t)
-    
-  }
+pfunc.1 = function(data, x, y, s, t, drop = TRUE) {
+  ggplot(data, aes_string(x, y, size = s, color = s)) +  
+    geom_point(aes(alpha = 0.8), show.legend = F) +  
+    scale_size_continuous(range = c(0, 25)) + 
+    scale_color_viridis_c(option = "viridis", begin=0.5, end=1, direction = -1) +  # Use a viridis continuous color palette
+    theme_classic() +
+    theme(axis.text.x = element_text(size = 25, angle = 90, vjust = 0.5),
+          plot.title = element_text(hjust = 0.5, size = 30),
+          axis.text.y = element_text(size = 35),
+          plot.margin = unit(c(3, 0.1, 3, 0.1), 'cm')) +
+    rremove("xlab") + rremove("ylab") + labs(title = t) + theme(plot.margin = unit(c(1,0.1,1,1), 'lines'))
+}
+
   
-pfunc.2 = function(data, x, y, s, col_var, color_vec, t, drop=TRUE) {
-    ggplot(data, aes_string(x, y, size = s, col = col_var)) +  geom_point(alpha = 0.8, show.legend = TRUE) +   scale_size_continuous(limits=c(0,18000),breaks=seq(0, 18000, 1000),range=c(0,40)) + scale_colour_manual(values=color_vec, drop=drop) + theme(axis.text.x = element_text(size=20, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_blank(), plot.margin=unit(c(3,0.01,3,0.01), 'cm')) + rremove("xlab") + rremove("ylab") + labs(title = t)
+pfunc.2 = function(data, x, y, s, t, drop=TRUE) {
+    ggplot(data, aes_string(x, y, size = s, col = s)) +  
+    geom_point(aes(alpha = 0.8), show.legend = F) +   
+    scale_size_continuous(range=c(0, 25)) + 
+    scale_color_viridis_c(option = "viridis", begin=0.5, end=1, direction = -1) +  # Use a viridis continuous color palette
+    theme_classic() +
+    theme(axis.text.x = element_text(size=25, angle=90, vjust = 0.5), plot.title = element_text(hjust = 0.5, size=30), axis.text.y = element_blank(), plot.margin=unit(c(3,0.01,3,0.01), 'cm')) + 
+    rremove("xlab") + rremove("ylab") + labs(title = t) + theme(plot.margin = unit(c(1,0.1,1,1), 'lines')) 
     
   }
 
@@ -147,43 +181,41 @@ br.colors <- brewer.pal(9,"Greens")
 br.colors.r <- br.colors[4:11]
   
 ## Viridis palette
-v <- viridis::inferno(n=57, direction= -1)
+v <- viridis::viridis(n=57, direction= 1)
   
 # Make a fake data frame to build the levels of each species per range of counts.
 numbers <- rep(seq(0, 18000, 999), 3)
-bac <- c(rep("Escherichia coli", 19), rep("Bifidobacterium longum", 19), rep("Bacteroides dorei/vulgatus", 19))
+bac <- c(rep("Escherichia coli", 19), rep("Bifidobacterium longum", 19), rep("Phocaeicola dorei/vulgatus", 19))
 df <- data.frame(numbers,bac)
 df$numbers.factor <- cut(df$numbers, seq(1, 18000, 1000))
 df <- tidyr::unite(df,"bac_counts",bac,numbers.factor,remove = F)
 col <- setNames(v, levels(factor(df$bac_counts)))
 
-  
 # Calling the function for plotting
-p1 <- pfunc.1(full_report1,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID1")
-p2 <- pfunc.2(full_report2,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID2")
-p3 <- pfunc.2(full_report3,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID3")
-p4 <- pfunc.2(full_report4,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID4")
-p5 <- pfunc.1(full_report5,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID5")
-p6 <- pfunc.2(full_report6,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID6")
-p7 <- pfunc.2(full_report7,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID7")
-p8 <- pfunc.2(full_report8,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID8")
-p9 <- pfunc.1(full_report9,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID9")
-p10 <- pfunc.2(full_report10,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID10")
-p11 <- pfunc.2(full_report11,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID11")
-p12 <- pfunc.2(full_report12,"Samples","Bacterial_species","Counts","Bac_counts", col, "ID12")
+p1 <- pfunc.1(full_report1,"Samples","Bacterial_species","Counts", "ID1")
+p2 <- pfunc.2(full_report2,"Samples","Bacterial_species","Counts", "ID2")
+p3 <- pfunc.2(full_report3,"Samples","Bacterial_species","Counts", "ID3")
+p4 <- pfunc.2(full_report4,"Samples","Bacterial_species","Counts", "ID4")
+p5 <- pfunc.1(full_report5,"Samples","Bacterial_species","Counts", "ID5")
+p6 <- pfunc.2(full_report6,"Samples","Bacterial_species","Counts", "ID6")
+p7 <- pfunc.2(full_report7,"Samples","Bacterial_species","Counts", "ID7")
+p8 <- pfunc.2(full_report8,"Samples","Bacterial_species","Counts", "ID8")
+p9 <- pfunc.1(full_report9,"Samples","Bacterial_species","Counts", "ID9")
+p10 <- pfunc.2(full_report10,"Samples","Bacterial_species","Counts", "ID10")
+p11 <- pfunc.2(full_report11,"Samples","Bacterial_species","Counts", "ID11")
+p12 <- pfunc.2(full_report12,"Samples","Bacterial_species","Counts", "ID12")
+
+tiff("abundances.jpeg", units="in", width=50, height=25, res=300)
 
 
-# Make a list of the plots
-plot.list <- list(p1, p2 , p3 , p4, p5, p6, p7, p8, p9, p10, p11, p12)
+arranged_plots <- p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12 +
+  plot_layout(ncol = 4, heights = c(2, 2, 2, 2), widths = c(2, 2, 2, 2))
 
-# Make the multiple plot figure
-figure.1 <- ggarrange(plotlist = plot.list, 
-                      ncol = 4, nrow = 3, align = "hv", common.legend = TRUE, legend = FALSE, 
-                      labels = NULL, 
-                      font.label = list(size = 10, color = "black", face = "bold", family = NULL, position = "top"))
+# Add a common legend using cowplot
+# common_legend <- get_legend(p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + p12)
 
-# figure.1
+arranged_plots
 
-# Annotate figure
-annotate_figure(figure.1, left = textGrob("Bacterial species", rot = 90, vjust = 1, gp = gpar(cex = 1.8)), bottom = textGrob("Days since birth", gp = gpar(cex = 1.8)))
+dev.off()
+
 ```
