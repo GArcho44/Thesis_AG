@@ -1,0 +1,691 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=12, fig.height=16, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library("Biostrings")
+library(ape)
+library(readr)
+library(readxl)
+library(RColorBrewer)
+library(stringr)
+library(viridis)
+library(scales)
+library(cowplot)
+library(ggpubr)
+library(grid)
+```
+
+```{r}
+## Read the data ##
+
+# Read the data with the SNPs number per sample per individual
+number_data <- read_xlsx("data/number_of_snps_e.coli.xlsx")
+number_data$Individual <- as.factor(number_data$Individual)
+
+# Read the data with the abundance information
+ab_data <-  read_xlsx("data/abundance_data.xlsx")
+```
+
+```{r}
+## ID1 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID1_mutect2_e.coli.csv")
+merged_data_midas <- read.csv("./data/snps_ID1_midas_e.coli.csv")
+
+# Create vectors containing time points information
+timepoints <- c(16,32,62,96,212,243,255,302) # (+)
+timepoints_named <- paste("(T", 1:8, sep="") # (+)
+timepoints_named.1 <- paste("T",1:8,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID1") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Escherichia coli") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 50)
+
+# Get the number of reads
+reads <- number_data[1:8,4] 
+Reads <- reads$Reads
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0, end=0.5, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID1") + 
+  ylab("MAF") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) +
+    scale_color_continuous(limits = c(0, 1000000))
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("MAF") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(aes(x = timepoints, y = -0.25, size = Reads), color = "#440154", alpha = 0.5)  +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(),  axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") ")) +guides(fill=guide_legend(title="Number of reads")) 
+  
+
+# Make the final plot
+p1 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## ID5 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID5_mutect2_e.coli.csv")
+merged_data_midas <- read.csv("./data/snps_ID5_midas_e.coli.csv")
+
+# Create vectors containing time points information
+timepoints <- c(11,32,62,92,109,122,152,212,244,314,363) # (+)
+timepoints_named <- paste("(T", 1:11, sep="") # (+)
+timepoints_named.1 <- paste("T",1:11,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report5 <- ab_data %>% filter(Sample.ID == "ID5") # (+)
+ab_info <- full_report5 %>% filter(Bacterial_species=="Escherichia coli") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 40) # (+)
+
+# Some additional processing for this specific individual
+ab_info <- ab_info[-3,] # remove the day 11 duplicate
+ab_info <- ab_info[-1,] # remove the day 109 duplicate
+
+# Get the number of reads
+reads <- number_data[26:36,4] 
+Reads <- reads$Reads
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0, end=0.5, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID5") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + 
+  theme_classic() +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  ylab("") + xlab("") + ylim(0,1) +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(aes(x = timepoints, y = -0.25, size = Reads), color = "#440154", alpha = 0.5)  +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(),  axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") ")) +guides(fill=guide_legend(title="Number of reads"))
+
+# Make the final plot
+p2 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+```
+
+```{r}
+## ID7 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID7_mutect2_e.coli.csv")
+merged_data_midas <- read.csv("./data/snps_ID7_midas_e.coli.csv")
+
+# Create vectors containing time points information
+timepoints <- c(9,45,69, 105, 128, 218, 249, 280) # (+)
+timepoints_named <- paste("(T", 1:8, sep="") # (+)
+timepoints_named.1 <- paste("T",1:8,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report7 <- ab_data %>% filter(Sample.ID == "ID7") # (+)
+ab_info <- full_report7 %>% filter(Bacterial_species=="Escherichia coli") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 50)
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0, end=0.5, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID7") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + 
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("") + xlab("") + ylim(0,1) +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#440154", alpha = 0.6) + 
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(),axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") "))
+
+# Make the final plot
+p3 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## ID12 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID12_mutect2_e.coli.csv")
+merged_data_midas <- read.csv("./data/snps_ID12_midas_e.coli.csv")
+
+# Create vectors containing time points information
+timepoints <- c(7, 9, 13, 60, 75, 89, 150, 241, 315) # (+)
+timepoints_seen <- c(7, 60, 75, 89, 150, 241, 315) # (+)
+timepoints_named <- c("(T1","(T4","(Τ5","(Τ6","(Τ7","(Τ8","(Τ9") # (+)
+timepoints_named.1 <- paste("T",1:9,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report12 <- ab_data %>% filter(Sample.ID == "ID12") # (+)
+ab_info <- full_report12 %>% filter(Bacterial_species=="Escherichia coli") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 30)
+
+# Some additional processing for this specific individual
+ab_info <- ab_info[-6,]
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0, end=0.5, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID12") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + 
+  theme_classic() +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  ylab("") + xlab("") + ylim(0,1) +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#440154", alpha = 0.5) + 
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints_seen, labels = paste(timepoints_named, timepoints_seen, sep = ") "))
+
+# Make the final plot
+p4 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6))
+
+```
+
+```{r}
+## Read the data ##
+
+# Read the data with the SNPs number per sample per individual
+number_data <- read_xlsx("data/number_of_snps_b.longum.xlsx")
+number_data$Individual <- as.factor(number_data$Individual)
+
+# Read the data with the abundance information
+ab_data <-  read_xlsx("data/abundance_data.xlsx")
+```
+
+```{r}
+## ID5 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID5_mutect2_b.longum.csv")
+merged_data_midas <- read.csv("./data/snps_ID5_midas_b.longum.csv")
+
+
+# Create vectors containing time points information
+timepoints <- c(11,32,62,92,109,122,152,314) # (+)
+timepoints_named <- paste("(T",1:8,sep="")
+timepoints_named.1 <- paste("T",1:8,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID5") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bifidobacterium longum") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 70)
+
+# some additional processing
+ab_info <- ab_info[-1,]
+
+# some additional processing
+ab_info$subsp <- number_data$Subsp[number_data$Individual==5]
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.25, end=0.75, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID5") + 
+  ylab("MAF") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) 
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("MAF") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#21918c", alpha = 0.5) + 
+  geom_point(data = number_data[18:25,], aes(x= Day, y = 0, shape=Subsp)) +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") "))
+
+# Make the final plot
+p5 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## ID8 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID8_mutect2_b.longum.csv")
+merged_data_midas <- read.csv("./data/snps_ID8_midas_b.longum.csv")
+
+# Create vectors containing time points information
+timepoints <- c(54,112,129,144,203,294,310) # (+)
+timepoints_named <- paste("(T",1:7,sep="")
+timepoints_named.1 <- paste("T",1:7,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID8") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bifidobacterium longum") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 50)
+
+# some additional processing
+ab_info$subsp <- number_data$Subsp[number_data$Individual==8] # (+)
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.25, end=0.75, direction=-1) +
+  theme_classic() +
+  ggtitle("ID8") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) 
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#21918c", alpha = 0.5) + 
+  geom_point(data = number_data[35:41,], aes(x= Day, y = 0, shape=Subsp)) +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") "))
+
+# Make the final plot
+p6 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## ID12 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID12_mutect2_b.longum.csv")
+merged_data_midas <- read.csv("./data/snps_ID12_midas_b.longum.csv")
+
+# Create vectors containing time points information
+timepoints <- c(7,9,13,60,75,89,135,150,241,315) # (+)
+timepoints_seen <- c(7,60,75,89,135,150,241,315) # (+)
+timepoints_named <- c("(T1","(T4","(T5","(T6","(T7)","(T8","(T9","(T10")
+timepoints_named.1 <- paste("T",1:10,sep="") 
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID12") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bifidobacterium longum") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 70)
+
+# some additional processing
+ab_info$subsp <- number_data$Subsp[number_data$Individual==12] # (+)
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.25, end=0.75, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID12") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) 
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#21918c", alpha = 0.5) + 
+  geom_point(data = number_data[60:69,], aes(x= Day, y = 0, shape=Subsp)) +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints_seen, labels = paste(timepoints_named, timepoints_seen, sep = ") "))
+
+# Make the final plot
+p7 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## Read the data ##
+
+# Read the data with the SNPs number per sample per individual
+number_data <- read_xlsx("data/number_of_snps_p.dorei.xlsx")
+number_data$Individual <- as.factor(number_data$Individual)
+
+# Read the data with the abundance information
+ab_data <-  read_xlsx("data/abundance_data.xlsx")
+```
+
+```{r}
+## ID1 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID1_mutect2_p.dorei.csv")
+merged_data_midas <- read.csv("./data/snps_ID1_midas_p.dorei.csv")
+
+# Create vectors containing time points information
+timepoints <- c(16,62,96,152,212,243,302,332,355) # (+)
+#timepoints_seen <- c(91,126,185,306,334) # (+)
+timepoints_named <- paste("(T",1:9,sep="")
+timepoints_named.1 <- paste("T",1:9,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID1") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bacteroides dorei/vulgatus") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 50)
+
+# some additional processing
+ab_info$species <- number_data$Species[number_data$Individual==1]
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.5, end=1, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID1") + 
+  ylab("MAF") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) +
+    scale_color_continuous(limits = c(0, 1000000))
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("MAF") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#fde725", alpha = 0.5) + 
+  geom_point(data = number_data[1:9,], aes(x= Day, y = 0, shape=Species)) +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") "))
+
+# Make the final plot
+p8 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+
+```
+
+```{r}
+## ID2 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID2_mutect2_p.dorei.csv")
+merged_data_midas <- read.csv("./data/snps_ID2_midas_p.dorei.csv")
+
+# Create vectors containing time points information
+timepoints <- c(66,91,126,156,185,217,246,306,310,311,313,317,327,334) # (+)
+timepoints_seen <- c(66,91,126,156,185,217,246,306,334) # (+)
+timepoints_named <- c("(T1","(T2","(T3","(T4","(T5","(T6","(T7","(T8","(T14")
+timepoints_named.1 <- paste("T",1:14,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID2") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bacteroides dorei/vulgatus") %>% filter(Samples %in% timepoints)
+
+# Further Processing
+ab_info <- ab_info[-1,]
+ab_info <- ab_info[-4,]
+ab_info <- ab_info[-6,]
+
+# some additional processing
+ab_info$Species <- number_data$Species[number_data$Individual==2]
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.5, end=1, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID2") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) +
+    scale_color_continuous(limits = c(0, 1000000))
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#fde725", alpha = 0.5) + 
+  geom_point(data = number_data[10:23,], aes(x= Day, y = 0, shape=Species)) +
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_x_continuous(breaks = timepoints_seen, labels = paste(timepoints_named, timepoints_seen, sep = ") "))
+
+# Make the final plot
+p9 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## ID7 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID7_mutect2_p.dorei.csv")
+merged_data_midas <- read.csv("./data/snps_ID7_midas_p.dorei.csv")
+
+# Create vectors containing time points information
+timepoints <- c(45,69,105,128,187,218,249,280) # (+)
+timepoints_named <- paste("(T",1:8,sep="")
+timepoints_named.1 <- paste("T",1:8,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID7") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bacteroides dorei/vulgatus") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 10)
+
+# some additional processing
+ab_info$species <- number_data$Species[number_data$Individual==7]
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.5, end=1, direction=-1) + 
+  theme_classic() +
+  ggtitle("ID7") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) +
+    scale_color_continuous(limits = c(0, 1000000))
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#fde725", alpha = 0.5) + 
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+   geom_point(data = number_data[41:48,], aes(x= Day, y = 0, shape=Species)) +
+  scale_x_continuous(breaks = timepoints, labels = paste(timepoints_named, timepoints, sep = ") "))
+
+# Make the final plot
+p10 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+
+```
+
+```{r}
+## ID12 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read the data
+merged_data_mutect2 <- read.csv("./data/snps_ID12_mutect2_p.dorei.csv")
+merged_data_midas <- read.csv("./data/snps_ID12_midas_p.dorei.csv")
+
+# Create vectors containing time points information
+timepoints <- c(7,9,13,60,75,150,241,315) # (+)
+timepoints_seen <- c(7,60,75,150,241,315) # (+)
+timepoints_named <- c("(T1","(T4","(Τ5","(T6","(T7","(T8")
+timepoints_named.1 <- paste("T",1:12,sep="") # (+)
+
+# Also, get the abundance information and store it into a new dataframe
+full_report1 <- ab_data %>% filter(Sample.ID == "ID12") # (+)
+ab_info <- full_report1 %>% filter(Bacterial_species=="Bacteroides dorei/vulgatus") %>% filter(Samples %in% timepoints) %>% filter(Counts >= 10)
+
+# Some additional processing
+ab_info <- ab_info[-1,]
+ab_info <- ab_info[-5,]
+
+# some additional processing
+ab_info$species <- number_data$Species[number_data$Individual==12]
+
+# Make violin plots for Mutect2
+main_plot_mutect2 <- ggplot(data=merged_data_mutect2, mapping=aes(x=timepoint,y=perc)) + 
+  geom_violin(aes(fill=SNPs),width=1) +
+  scale_fill_viridis(option="viridis", begin=0.5, end=1, direction=-1) +
+  theme_classic() +
+  ggtitle("ID12") + 
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1) +
+    scale_color_continuous(limits = c(0, 1000000))
+
+# Make violin plots for MIDAS
+main_plot_midas <- ggplot(data=merged_data_midas, mapping=aes(x=timepoint,y=minor.freq)) + 
+  geom_violin(aes(fill=SNPs),width=1)  + ylim(0,1) +
+  scale_fill_viridis(option="inferno", begin=0.2, end=0.8, direction=-1) + 
+  theme_classic() +
+  ylab("") + xlab("") +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right") +
+  scale_x_discrete(labels=timepoints_named.1)
+
+# Create a new plot with the box outside the plot panel
+box_plot <- ggplot() + 
+  geom_rect(aes(xmin=0,xmax=365,ymin=-0.5,ymax=0),fill="white",col="black") + 
+  xlab("Day") + 
+  geom_segment(aes(x = timepoints, y = -0.5, xend = timepoints, yend = 0), color = "black") + 
+  geom_point(data = ab_info, aes(x = Samples, y = -0.25, size = Counts), color = "#fde725", alpha = 0.5) + 
+  theme(legend.position="right", axis.title.y=element_blank(), axis.text.y=element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6), panel.grid = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  geom_point(data = number_data[72:79,], aes(x= Day, y = 0, shape=Species)) +
+  scale_x_continuous(breaks = timepoints_seen, labels = paste(timepoints_named, timepoints_seen, sep = ") "))
+
+# Make the final plot
+p11 <- plot_grid(main_plot_mutect2, main_plot_midas, box_plot, nrow=3, rel_heights = c(1,1, 0.6)) 
+```
+
+
+```{r}
+
+tiff("SNPs_viz_sup.tiff", units="in", width=20, height=20, res=300)
+
+plot_grid(p1,p2,p3,p4,p5,p6,p7,NULL,p8,p9,p10,p11, nrow=3, labels = c("A","","","","B","","","","C","","",""))
+
+dev.off()
+```
+
