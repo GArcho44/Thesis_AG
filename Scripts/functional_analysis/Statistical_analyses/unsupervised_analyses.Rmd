@@ -1,0 +1,610 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=6, fig.height=2, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(readxl)
+library(viridis)
+library(scales)
+library(cowplot)
+```
+
+```{r}
+## E. coli, ID2 ##
+
+## Read the data ##
+
+ref.info.f <- read.csv("../data/E.coli.ID2.csv", row.names = 1)
+
+# give row names the site ids
+rownames(ref.info.f) <- ref.info.f$Site.ID
+
+## Get only the REF allele information per sample ##
+
+ref.info.f <- ref.info.f[,6:15]
+
+# Transpose the data frames
+ref.info.f <- as.data.frame(t(ref.info.f))
+
+# Give new column names and get the timepoint (Day) as y response variable
+names <- list.files("../Pangenomics/ID2_E.coli/.", pattern = "co-ords.tab")
+
+names <- gsub(".co.*","",names)
+
+days <- gsub("ID.*d","", names)
+days <- gsub(".s.*","", days)
+days <- as.numeric(days)
+#ref.info.f$Day <- days
+
+# Ordinal encoding of the DNA sequence to be used in ML
+
+ref.info.f <- as.data.frame(lapply(ref.info.f, function(x) { 
+  x[x == 'A'] <- 0.25
+  x[x == 'T'] <- 0.50
+  x[x == 'G'] <- 0.75
+  x[x == 'C'] <- 1
+  x[x == 'N'] <- 0
+  return(x)
+}))
+
+rownames(ref.info.f) <- names
+
+## Process the data ##
+
+# Convert all columns to numeric using sapply()
+ref.info.f.n <- as.data.frame(sapply(ref.info.f, as.numeric))
+
+x_matrix <- as.matrix(ref.info.f.n)
+
+## Perform PCA ##
+
+# scale data
+scaled_data <- scale(x_matrix, center=TRUE, scale=TRUE)
+scaled_data[is.na(scaled_data)] <- 0
+
+# Insert a colour pallete
+v <- viridis::viridis(n=366, direction = -1)
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data * scaled_data) # calculates the sum of squares
+USV <- svd(scaled_data)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- days
+
+p1 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2)) + 
+  geom_point(aes(col=Day)) + xlab("PC1 (41.50%)") + 
+  scale_color_viridis(option="viridis", begin=0, end=0.5, direction=-1) +
+  ylab("PC2 (24.41%)") + ggtitle("PCA") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_classic() +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right")
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- colnames(ref.info.f.n)[top_10_rows]
+row_nameS
+
+p1
+
+```
+
+```{r}
+## E. coli, ID9 ##
+
+## Read the data ##
+
+ref.info.f <- read.csv("../data/E.coli.ID9.csv", row.names = 1)
+
+# give row names the site ids
+rownames(ref.info.f) <- ref.info.f$Site.ID
+
+## Get only the REF allele information per sample ##
+
+ref.info.f <- ref.info.f[,6:14]
+
+# Transpose the data frames
+ref.info.f <- as.data.frame(t(ref.info.f))
+
+# Give new column names and get the timepoint (Day) as y response variable
+names <- list.files("../Pangenomics/ID9_E.coli/.", pattern = "co-ords.tab")
+
+names <- gsub(".co.*","",names)
+
+days <- gsub("ID.*d","", names)
+days <- gsub(".s.*","", days)
+days <- as.numeric(days)
+#ref.info.f$Day <- days
+
+# Ordinal encoding of the DNA sequence to be used in ML
+
+ref.info.f <- as.data.frame(lapply(ref.info.f, function(x) { 
+  x[x == 'A'] <- 0.25
+  x[x == 'T'] <- 0.50
+  x[x == 'G'] <- 0.75
+  x[x == 'C'] <- 1
+  x[x == 'N'] <- 0
+  return(x)
+}))
+
+rownames(ref.info.f) <- names
+
+## Process the data ##
+
+# Convert all columns to numeric using sapply()
+ref.info.f.n <- as.data.frame(sapply(ref.info.f, as.numeric))
+
+x_matrix <- as.matrix(ref.info.f.n)
+
+## Perform PCA ##
+
+# scale data
+scaled_data <- scale(x_matrix, center=TRUE, scale=TRUE)
+scaled_data[is.na(scaled_data)] <- 0
+
+# Insert a colour pallete
+v <- viridis::viridis(n=366, direction = -1)
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data * scaled_data) # calculates the sum of squares
+USV <- svd(scaled_data)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- days
+
+p2 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2)) + 
+  geom_point(aes(col=Day)) + xlab("PC1 (38.74%)") + 
+  scale_color_viridis(option="viridis", begin=0, end=0.5, direction=-1) +
+  ylab("PC2 (29.59%)") + ggtitle("PCA") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_classic() +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right")
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- colnames(ref.info.f.n)[top_10_rows]
+row_nameS
+
+p2
+
+```
+
+```{r}
+## B. longum, ID2 ##
+
+## Read the data ##
+
+ref.info.f <- read.csv("../data/B.longum.ID2.csv", row.names = 1)
+
+# give row names the site ids
+rownames(ref.info.f) <- ref.info.f$Site.ID
+
+## Get only the REF allele information per sample ##
+
+ref.info.f <- ref.info.f[,6:16]
+
+# Transpose the data frames
+ref.info.f <- as.data.frame(t(ref.info.f))
+
+# Give new column names and get the timepoint (Day) as y response variable
+names <- list.files("../Pangenomics/ID2_B.longum/.", pattern = "S_")
+
+names <- gsub("S_","",names)
+
+days <- gsub("ID.*d","", names)
+days <- gsub(".s.*","", days)
+days <- as.numeric(days)
+#ref.info.f$Day <- days
+
+# Ordinal encoding of the DNA sequence to be used in ML
+
+ref.info.f <- as.data.frame(lapply(ref.info.f, function(x) { 
+  x[x == 'A'] <- 0.25
+  x[x == 'T'] <- 0.50
+  x[x == 'G'] <- 0.75
+  x[x == 'C'] <- 1
+  x[x == 'N'] <- 0
+  return(x)
+}))
+
+rownames(ref.info.f) <- names
+
+## Process the data ##
+
+# Convert all columns to numeric using sapply()
+ref.info.f.n <- as.data.frame(sapply(ref.info.f, as.numeric))
+
+x_matrix <- as.matrix(ref.info.f.n)
+
+## Perform PCA ##
+
+# scale data
+scaled_data <- scale(x_matrix, center=TRUE, scale=TRUE)
+scaled_data[is.na(scaled_data)] <- 0
+
+# Insert a colour pallete
+v <- viridis::viridis(n=366, direction = -1)
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data * scaled_data) # calculates the sum of squares
+USV <- svd(scaled_data)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- days
+
+p3 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2)) + 
+  geom_point(aes(col=Day)) + xlab("PC1 (76.46%)") + 
+  scale_color_viridis(option="viridis", begin=0.25, end=0.75, direction=-1) +
+  ylab("PC2 (14.59%)") + ggtitle("PCA") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_classic() +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right")
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- colnames(ref.info.f.n)[top_10_rows]
+row_nameS
+
+p3
+
+```
+
+```{r}
+## B. longum, ID9 ##
+
+## Read the data ##
+
+ref.info.f <- read.csv("../data/B.longum.ID9.csv", row.names = 1)
+
+# give row names the site ids
+rownames(ref.info.f) <- ref.info.f$Site.ID
+
+## Get only the REF allele information per sample ##
+
+ref.info.f <- ref.info.f[,6:20]
+
+# Transpose the data frames
+ref.info.f <- as.data.frame(t(ref.info.f))
+
+# Give new column names and get the timepoint (Day) as y response variable
+names <- list.files("../Pangenomics/ID9_B.longum/.", pattern = "S_")
+
+names <- gsub("S_","",names)
+
+days <- gsub("ID.*d","", names)
+days <- gsub(".s.*","", days)
+days <- as.numeric(days)
+#ref.info.f$Day <- days
+
+# Ordinal encoding of the DNA sequence to be used in ML
+
+ref.info.f <- as.data.frame(lapply(ref.info.f, function(x) { 
+  x[x == 'A'] <- 0.25
+  x[x == 'T'] <- 0.50
+  x[x == 'G'] <- 0.75
+  x[x == 'C'] <- 1
+  x[x == 'N'] <- 0
+  return(x)
+}))
+
+rownames(ref.info.f) <- names
+
+## Process the data ##
+
+# Convert all columns to numeric using sapply()
+ref.info.f.n <- as.data.frame(sapply(ref.info.f, as.numeric))
+
+x_matrix <- as.matrix(ref.info.f.n)
+
+## Perform PCA ##
+
+# scale data
+scaled_data <- scale(x_matrix, center=TRUE, scale=TRUE)
+scaled_data[is.na(scaled_data)] <- 0
+
+# Insert a colour pallete
+v <- viridis::viridis(n=366, direction = -1)
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data * scaled_data) # calculates the sum of squares
+USV <- svd(scaled_data)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- days
+
+p4 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2)) + 
+  geom_point(aes(col=Day)) + xlab("PC1 (67.33%)") + 
+  scale_color_viridis(option="viridis", begin=0.25, end=0.75, direction=-1) +
+  ylab("PC2 (11.60%)") + ggtitle("PCA") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_classic() +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right")
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- colnames(ref.info.f.n)[top_10_rows]
+row_nameS
+
+p4
+
+```
+
+```{r}
+## P. dorei, ID5 ##
+
+## Read the data ##
+
+ref.info.f <- read.csv("../data/P.dorei.ID5.csv", row.names = 1)
+
+# give row names the site ids
+rownames(ref.info.f) <- ref.info.f$Site.ID
+
+## Get only the REF allele information per sample ##
+
+ref.info.f <- ref.info.f[,6:20]
+
+# Transpose the data frames
+ref.info.f <- as.data.frame(t(ref.info.f))
+
+# Give new column names and get the timepoint (Day) as y response variable
+names <- list.files("../Pangenomics/ID5_P.dorei/.", pattern = "S_")
+
+names <- gsub("S_","",names)
+
+days <- gsub("ID.*d","", names)
+days <- gsub(".s.*","", days)
+days <- as.numeric(days)
+#ref.info.f$Day <- days
+
+# Ordinal encoding of the DNA sequence to be used in ML
+
+ref.info.f <- as.data.frame(lapply(ref.info.f, function(x) { 
+  x[x == 'A'] <- 0.25
+  x[x == 'T'] <- 0.50
+  x[x == 'G'] <- 0.75
+  x[x == 'C'] <- 1
+  x[x == 'N'] <- 0
+  return(x)
+}))
+
+rownames(ref.info.f) <- names
+
+## Process the data ##
+
+# Convert all columns to numeric using sapply()
+ref.info.f.n <- as.data.frame(sapply(ref.info.f, as.numeric))
+
+x_matrix <- as.matrix(ref.info.f.n)
+
+## Perform PCA ##
+
+# scale data
+scaled_data <- scale(x_matrix, center=TRUE, scale=TRUE)
+scaled_data[is.na(scaled_data)] <- 0
+
+# Insert a colour pallete
+v <- viridis::viridis(n=366, direction = -1)
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data * scaled_data) # calculates the sum of squares
+USV <- svd(scaled_data)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- days
+
+p5 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2)) + 
+  geom_point(aes(col=Day)) + xlab("PC1 (68.04%)") + 
+  scale_color_viridis(option="viridis", begin=0.5, end=1, direction=-1) +
+  ylab("PC2 (9.83%)") + ggtitle("PCA") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_classic() +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right")
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- colnames(ref.info.f.n)[top_10_rows]
+row_nameS
+
+p5
+
+```
+
+```{r}
+## P. dorei, ID9 ##
+
+## Read the data ##
+
+ref.info.f <- read.csv("../data/P.dorei.ID9.csv", row.names = 1)
+
+# give row names the site ids
+rownames(ref.info.f) <- ref.info.f$Site.ID
+
+## Get only the REF allele information per sample ##
+
+ref.info.f <- ref.info.f[,6:17]
+
+# Transpose the data frames
+ref.info.f <- as.data.frame(t(ref.info.f))
+
+# Give new column names and get the timepoint (Day) as y response variable
+names <- list.files("../Pangenomics/ID9_P.dorei/.", pattern = "S_")
+
+names <- gsub("S_","",names)
+
+days <- gsub("ID.*d","", names)
+days <- gsub(".s.*","", days)
+days <- as.numeric(days)
+#ref.info.f$Day <- days
+
+# Ordinal encoding of the DNA sequence to be used in ML
+
+ref.info.f <- as.data.frame(lapply(ref.info.f, function(x) { 
+  x[x == 'A'] <- 0.25
+  x[x == 'T'] <- 0.50
+  x[x == 'G'] <- 0.75
+  x[x == 'C'] <- 1
+  x[x == 'N'] <- 0
+  return(x)
+}))
+
+rownames(ref.info.f) <- names
+
+## Process the data ##
+
+# Convert all columns to numeric using sapply()
+ref.info.f.n <- as.data.frame(sapply(ref.info.f, as.numeric))
+
+x_matrix <- as.matrix(ref.info.f.n)
+
+## Perform PCA ##
+
+# scale data
+scaled_data <- scale(x_matrix, center=TRUE, scale=TRUE)
+scaled_data[is.na(scaled_data)] <- 0
+
+# Insert a colour pallete
+v <- viridis::viridis(n=366, direction = -1)
+
+# Singular value decomposition for cog
+ssqtotal <- sum(scaled_data * scaled_data) # calculates the sum of squares
+USV <- svd(scaled_data)
+PCA_scores <- USV$u %*% diag(USV$d) # calculate scores
+PCA_loadings <- USV$v # loadings
+
+npc <- 3 # calculate 3 PCs
+ssq <- 0 * (1:npc) # Initialize variable ssq
+for (i in 1:npc){   #for loop to calculate sum of squares for each component.
+  Xest <- PCA_scores[,i] %*% t(PCA_loadings[,i])
+  ssq[i] <- 100*sum(Xest*Xest)/ssqtotal
+}
+ssqcum = cumsum(ssq) # calculate cumulative ssq
+variance_exp = data.frame(ssq=ssq, ssqtotal=ssqcum)
+variance_exp
+
+# Plot the PCA results
+PCA_scores <- as.data.frame(PCA_scores)
+
+# get the day for each sample
+PCA_scores$Day <- days
+
+p6 <- ggplot(data=PCA_scores, mapping=aes(x=V1,y=V2)) + 
+  geom_point(aes(col=Day)) + xlab("PC1 (94.06%)") + 
+  scale_color_viridis(option="viridis", begin=0.5, end=1, direction=-1) +
+  ylab("PC2 (2.45%)") + ggtitle("PCA") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme_classic() +
+  theme(plot.title=element_text(hjust = 0.5), legend.position="right")
+
+# Get the top 10 variables
+max_row <- which.min(PCA_loadings[,1])
+top_10_rows <- head(order(-abs(PCA_loadings[,1])),10)
+row_nameS <- colnames(ref.info.f.n)[top_10_rows]
+row_nameS
+
+p6
+
+```
+
+```{r}
+# Create & save the final plot as tiff image
+
+tiff("PCA_SNPs.tiff", units="in", width=20, height=10, res=300)
+
+plot_grid(p1,p3,p5,p2,p4,p6, nrow=2, labels = c("A","B","C"))
+
+dev.off()
+```
