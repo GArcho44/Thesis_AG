@@ -1,0 +1,790 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=16, fig.height=10, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library("Biostrings")
+library(ape)
+library(readr)
+library(readxl)
+library(RColorBrewer)
+library(stringr)
+library(viridis)
+library(scales)
+library(cowplot)
+```
+
+```{r}
+## Read the data ##
+
+# Read the data with the SNPs number per sample per individual
+number_data <- read_xlsx("data/number_of_snps_e.coli.xlsx")
+number_data$Individual <- as.factor(number_data$Individual)
+
+# Read the data with the abundance information
+ab_data <-  read_xlsx("data/abundance_data.xlsx")
+```
+
+```{r}
+## Help function ##
+
+# Create a help function to read the vcf files (so it can be used inside the lapply)
+read_vcf <- function(data) {
+  fread(file=paste("./data/SNPs/", data, sep=""), sep='\t', header = TRUE, skip = '#CHROM')
+}
+```
+
+```{r}
+# Just a plot of the number of SNPs of E. coli per sample to check which IDs to plot further
+ggplot(data=number_data, mapping=aes(x=Day,y=SNPs,col=Individual)) + geom_line(linewidth=1) + geom_point(size=3)
+```
+
+```{r}
+# Make a function that calculates the frequency of the alt allele per position given a dataframe as argument
+
+freq_calc <- function(data){
+    
+            # Get the correct information from the AS_SB_Table (INFO column)
+            data$frequencies <- sub("DP.*", "", data$INFO) 
+            data$frequencies <- sub(".*AS_SB_TABLE=", "", data$frequencies) 
+            data$frequencies <- str_replace_all(data$frequencies, "[[:punct:]]", " ")
+            data$frequencies <- regmatches(data$frequencies, gregexpr("[[:digit:]]+", data$frequencies))
+            
+            # Calculate the frequencies and store them into a new column named perc
+            for (i in 1:nrow(data)) {
+              ref <- as.numeric(unlist(data$frequencies[i])[1]) + as.numeric(unlist(data$frequencies[i])[2])
+              alt <- as.numeric(unlist(data$frequencies[i])[3]) + as.numeric(unlist(data$frequencies[i])[4])
+              
+              data$perc[i] <- alt / (ref + alt)
+              
+            }
+  data
+          }
+```
+
+```{r}
+## ID1 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read midas data
+# Read MIDAS data for e. coli & ID1
+midas.data.id1 <- read_csv("data/SNPs/102506.ID1.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id1.f <- midas.data.id1 %>% filter(passesMidasFilter==TRUE)
+
+# Read all the vcf files of the corresponding sub-directory
+
+# Make a list of the names of the vcf files
+file.list.id1 <- list.files(path="./data/SNPs/", pattern = fixed("ID1_d"))
+
+# Then apply the read function to each file
+df.list.id1 <- lapply(file.list.id1, read_vcf)
+
+# Apply the function for the dataframes contained in the list
+fr.list.id1 <- lapply(df.list.id1, freq_calc)
+
+
+# Get the perc columns from the created list for each day for Mutect2 (+)
+data_T1.mutect2 <- as.data.frame(fr.list.id1[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[1], Tool="Mutect2") %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list.id1[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[2], Tool="Mutect2") %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list.id1[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[3], Tool="Mutect2") %>% filter(perc>=0.01) 
+data_T4.mutect2 <- as.data.frame(fr.list.id1[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[4], Tool="Mutect2") %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list.id1[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[5], Tool="Mutect2") %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list.id1[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[6], Tool="Mutect2") %>% filter(perc>=0.01)
+data_T7.mutect2 <- as.data.frame(fr.list.id1[7]) %>% select(perc) %>% mutate(timepoint="T07",SNPs=number_data$SNPs[7], Tool="Mutect2") %>% filter(perc>=0.01)
+data_T8.mutect2 <- as.data.frame(fr.list.id1[8]) %>% select(perc) %>% mutate(timepoint="T08",SNPs=number_data$SNPs[8], Tool="Mutect2")%>% filter(perc>=0.01)
+
+# Get the perc columns for MIDAS (+)
+data_T1.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_ID1_d16_s109) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T1.midas <- data_T1.midas %>% mutate(SNPs=nrow(data_T1.midas))
+
+n1.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_ID1_d16_s109) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T2.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d32_s2) %>% mutate(timepoint="T02", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T2.midas <- data_T2.midas %>% mutate(SNPs=nrow(data_T2.midas))
+
+n2.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d32_s2) %>% mutate(timepoint="T02", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T3.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d62_s75) %>% mutate(timepoint="T03", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T3.midas <- data_T3.midas %>% mutate(SNPs=nrow(data_T3.midas))
+
+n3.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d62_s75) %>% mutate(timepoint="T03", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T4.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d96_s52) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T4.midas <- data_T4.midas %>% mutate(SNPs=nrow(data_T4.midas))
+
+n4.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d96_s52) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T5.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d212_s69) %>% mutate(timepoint="T05", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T5.midas <- data_T5.midas %>% mutate(SNPs=nrow(data_T5.midas))
+
+n5.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d212_s69) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T6.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d243_s46) %>% mutate(timepoint="T06", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T6.midas <- data_T6.midas %>% mutate(SNPs=nrow(data_T6.midas))
+
+n6.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d243_s46) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T7.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d255_s38) %>% mutate(timepoint="T07", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T7.midas <- data_T7.midas %>% mutate(SNPs=nrow(data_T7.midas))
+
+n7.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d255_s38) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T8.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d302_s1) %>% mutate(timepoint="T08", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T8.midas <- data_T8.midas %>% mutate(SNPs=nrow(data_T8.midas))
+
+n8.midas <- as.data.frame(midas.data.id1.f$id_ref_allele_freq_id1_d302_s1) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+# Merge the dataframes 
+
+# first put all the data into a list
+df_list.id1.mutect2 <- list(data_T1.mutect2, data_T2.mutect2, data_T3.mutect2, data_T4.mutect2, data_T5.mutect2, data_T6.mutect2, data_T7.mutect2, data_T8.mutect2) # (+)
+
+df_list.id1.midas <- list(data_T1.midas, data_T2.midas, data_T3.midas, data_T4.midas, data_T5.midas, data_T6.midas, data_T7.midas, data_T8.midas)
+
+# then merge them into a new dataframe 
+merged_data_mutect2 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id1.mutect2) 
+merged_data_midas <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id1.midas)
+
+# Write the data for later use
+write.csv(merged_data_mutect2, './data/SNPs_pre/snps_ID1_mutect2.csv')
+write.csv(merged_data_midas, './data/SNPs_pre/snps_ID1_midas.csv')
+
+```
+
+```{r}
+## ID2 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read midas data
+# Read MIDAS data for e. coli & ID1
+midas.data.id2 <- read_csv("data/SNPs/102506.ID2.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id2.f <- midas.data.id2 %>% filter(passesMidasFilter==TRUE)
+
+# Read all the vcf files of the current directory
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID02_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+
+fr.list <- lapply(df.list, freq_calc)
+
+for (i in 1:length(df.list)) {
+  data <- as.data.frame(fr.list[i]) %>% select(X.CHROM,POS,REF,ALT,perc)
+  file_name <- paste("./data/SNPs/sample", i, ".csv", sep = "")
+  write.csv(data, file_name)
+}
+
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[9]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[10]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[11]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[12]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[13]) %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[14]) %>% filter(perc>=0.01)
+data_T7.mutect2 <- as.data.frame(fr.list[7]) %>% select(perc) %>% mutate(timepoint="T07",SNPs=number_data$SNPs[15]) %>% filter(perc>=0.01)
+data_T8.mutect2 <- as.data.frame(fr.list[8]) %>% select(perc) %>% mutate(timepoint="T08",SNPs=number_data$SNPs[16]) %>% filter(perc>=0.01)
+data_T9.mutect2 <- as.data.frame(fr.list[9]) %>% select(perc) %>% mutate(timepoint="T09",SNPs=number_data$SNPs[17]) %>% filter(perc>=0.01)
+data_T10.mutect2 <- as.data.frame(fr.list[10]) %>% select(perc) %>% mutate(timepoint="T10",SNPs=number_data$SNPs[18]) %>% filter(perc>=0.01)
+
+# Get the perc columns for MIDAS (+)
+data_T1.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d91_s64) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T1.midas <- data_T1.midas %>% mutate(SNPs=nrow(data_T1.midas))
+
+n1.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d91_s64) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T2.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d126_s67) %>% mutate(timepoint="T02", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T2.midas <- data_T2.midas %>% mutate(SNPs=nrow(data_T2.midas))
+
+n2.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d126_s67) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T3.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d156_s48) %>% mutate(timepoint="T03", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T3.midas <- data_T3.midas %>% mutate(SNPs=nrow(data_T3.midas))
+
+n3.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d156_s48) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T4.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d185_s155) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T4.midas <- data_T4.midas %>% mutate(SNPs=nrow(data_T4.midas))
+
+n4.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d185_s155) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T5.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d306_s21) %>% mutate(timepoint="T05", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T5.midas <- data_T5.midas %>% mutate(SNPs=nrow(data_T5.midas))
+
+n5.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_id2_d306_s21) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T6.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d310_s58) %>% mutate(timepoint="T06", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T6.midas <- data_T6.midas %>% mutate(SNPs=nrow(data_T6.midas))
+
+n6.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d310_s58) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T7.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d316_s116) %>% mutate(timepoint="T07", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T7.midas <- data_T7.midas %>% mutate(SNPs=nrow(data_T7.midas))
+
+n7.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d316_s116) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T8.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d317_s95) %>% mutate(timepoint="T08", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T8.midas <- data_T8.midas %>% mutate(SNPs=nrow(data_T8.midas))
+
+n8.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d317_s95) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T9.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d327_s122) %>% mutate(timepoint="T09", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T9.midas <- data_T9.midas %>% mutate(SNPs=nrow(data_T9.midas))
+
+n9.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d327_s122) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T10.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d334_s88) %>% mutate(timepoint="T10", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T10.midas <- data_T10.midas %>% mutate(SNPs=nrow(data_T10.midas))
+
+n10.midas <- as.data.frame(midas.data.id2.f$id_ref_allele_freq_ID2_d334_s88) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+# Merge the dataframes & get abundance information
+
+# first put all the data into a list
+df_list.id2.mutect2 <- list(data_T1.mutect2, data_T2.mutect2, data_T3.mutect2, data_T4.mutect2, data_T5.mutect2, data_T6.mutect2, data_T7.mutect2, data_T8.mutect2, data_T9.mutect2, data_T10.mutect2) # (+)
+
+df_list.id2.midas <- list(data_T1.midas, data_T2.midas, data_T3.midas, data_T4.midas, data_T5.midas, data_T6.midas, data_T7.midas, data_T8.midas, data_T9.midas, data_T10.midas)
+
+# then merge them into a new dataframe 
+merged_data_mutect2 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id2.mutect2) 
+merged_data_midas <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id2.midas) 
+
+# Write the data for later use
+write.csv(merged_data_mutect2, './data/SNPs_pre/snps_ID2_mutect2.csv')
+write.csv(merged_data_midas, './data/SNPs_pre/snps_ID2_midas.csv')
+
+```
+
+```{r}
+## ID3 ##
+## Extract the # of SNPs information
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id3 <- read_csv("data/SNPs/102506.ID3.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id3.f <- midas.data.id3 %>% filter(passesMidasFilter==TRUE)
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID3_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+
+# Get the # of SNPs for mutect2
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[19]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[20]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[21]) %>% filter(perc>=0.01)
+
+# Get the # of SNPs for MIDAS
+n1.midas <- as.data.frame(midas.data.id3.f$id_ref_allele_freq_ID3_d17_s89) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n2.midas <- as.data.frame(midas.data.id3.f$id_ref_allele_freq_id3_d123_s71) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n3.midas <- as.data.frame(midas.data.id3.f$id_ref_allele_freq_id3_d186_s51) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+```
+
+```{r}
+## ID4 ##
+## Extract the # of SNPs information
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id4 <- read_csv("data/SNPs/102506.ID4.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id4.f <- midas.data.id4 %>% filter(passesMidasFilter==TRUE)
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID4_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[22]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[23]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[24]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[25]) %>% filter(perc>=0.01)
+
+# Get the # of SNPs for MIDAS
+n1.midas <- as.data.frame(midas.data.id4.f$id_ref_allele_freq_id4_d123_s88) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n2.midas <- as.data.frame(midas.data.id4.f$id_ref_allele_freq_id4_d154_s53) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n3.midas <- as.data.frame(midas.data.id4.f$id_ref_allele_freq_id4_d184_s117) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n4.midas <- as.data.frame(midas.data.id4.f$id_ref_allele_freq_id4_d214_s145) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+
+```
+
+```{r}
+## ID5 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read midas data
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id5 <- read_csv("data/SNPs/102506.ID5.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id5.f <- midas.data.id5 %>% filter(passesMidasFilter==TRUE)
+
+# Read all the vcf files of the current directory
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID5_d"))
+file.list
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[26]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[27]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[28]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[29]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[30]) %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[31]) %>% filter(perc>=0.01)
+data_T7.mutect2 <- as.data.frame(fr.list[7]) %>% select(perc) %>% mutate(timepoint="T07",SNPs=number_data$SNPs[32]) %>% filter(perc>=0.01)
+data_T8.mutect2 <- as.data.frame(fr.list[8]) %>% select(perc) %>% mutate(timepoint="T08",SNPs=number_data$SNPs[33]) %>% filter(perc>=0.01)
+data_T9.mutect2 <- as.data.frame(fr.list[9]) %>% select(perc) %>% mutate(timepoint="T09",SNPs=number_data$SNPs[34]) %>% filter(perc>=0.01)
+data_T10.mutect2 <- as.data.frame(fr.list[10]) %>% select(perc) %>% mutate(timepoint="T10",SNPs=number_data$SNPs[35]) %>% filter(perc>=0.01)
+data_T11.mutect2 <- as.data.frame(fr.list[11]) %>% select(perc) %>% mutate(timepoint="T11",SNPs=number_data$SNPs[36]) %>% filter(perc>=0.01)
+
+# Get the perc columns for MIDAS (+)
+data_T1.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_ID5_d11_s75) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T1.midas <- data_T1.midas %>% mutate(SNPs=nrow(data_T1.midas))
+
+n1.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_ID5_d11_s75) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T2.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d32_s159) %>% mutate(timepoint="T02", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T2.midas <- data_T2.midas %>% mutate(SNPs=nrow(data_T2.midas))
+
+n2.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d32_s159) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T3.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d62_s114) %>% mutate(timepoint="T03", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T3.midas <- data_T3.midas %>% mutate(SNPs=nrow(data_T3.midas))
+
+n3.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d62_s114) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T4.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d92_s153) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T4.midas <- data_T4.midas %>% mutate(SNPs=nrow(data_T4.midas))
+
+n4.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d92_s153) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T5.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_ID5_d109_s4) %>% mutate(timepoint="T05", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T5.midas <- data_T5.midas %>% mutate(SNPs=nrow(data_T5.midas))
+
+n5.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_ID5_d109_s4) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T6.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d122_s123) %>% mutate(timepoint="T06", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T6.midas <- data_T6.midas %>% mutate(SNPs=nrow(data_T6.midas))
+
+n6.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d122_s123) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T7.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d152_s90) %>% mutate(timepoint="T07", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T7.midas <- data_T7.midas %>% mutate(SNPs=nrow(data_T7.midas))
+
+n7.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d152_s90) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T8.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d212_s124) %>% mutate(timepoint="T08", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T8.midas <- data_T8.midas %>% mutate(SNPs=nrow(data_T8.midas))
+
+n8.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d212_s124) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T9.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d244_s14) %>% mutate(timepoint="T09", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T9.midas <- data_T9.midas %>% mutate(SNPs=nrow(data_T9.midas))
+
+n9.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d244_s14) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T10.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_ID5_d314_s74) %>% mutate(timepoint="T10", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T10.midas <- data_T10.midas %>% mutate(SNPs=nrow(data_T10.midas))
+
+n10.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_ID5_d314_s74) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T11.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d363_s157) %>% mutate(timepoint="T11", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T11.midas <- data_T11.midas %>% mutate(SNPs=nrow(data_T11.midas))
+
+n11.midas <- as.data.frame(midas.data.id5.f$id_ref_allele_freq_id5_d363_s157) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+# Merge the dataframes & get abundance information
+
+# first put all the data into a list
+df_list.id5.mutect2 <- list(data_T1.mutect2, data_T2.mutect2, data_T3.mutect2, data_T4.mutect2, data_T5.mutect2, data_T6.mutect2, data_T7.mutect2, data_T8.mutect2, data_T9.mutect2, data_T10.mutect2, data_T11.mutect2) # (+)
+
+df_list.id5.midas <- list(data_T1.midas, data_T2.midas, data_T3.midas, data_T4.midas, data_T5.midas, data_T6.midas, data_T7.midas, data_T8.midas, data_T9.midas, data_T10.midas, data_T11.midas)
+
+# then merge them into a new dataframe 
+merged_data_mutect2 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id5.mutect2) 
+merged_data_midas <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id5.midas) 
+
+# Write the data for later use
+write.csv(merged_data_mutect2, './data/SNPs_pre/snps_ID5_mutect2.csv')
+write.csv(merged_data_midas, './data/SNPs_pre/snps_ID5_midas.csv')
+```
+
+```{r}
+## ID7 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id7 <- read_csv("data/SNPs/102506.ID7.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id7.f <- midas.data.id7 %>% filter(passesMidasFilter==TRUE)
+
+# Read all the vcf files of the current directory
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID7_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[37]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[38]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[39]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[40]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[41]) %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[42]) %>% filter(perc>=0.01)
+data_T7.mutect2 <- as.data.frame(fr.list[7]) %>% select(perc) %>% mutate(timepoint="T07",SNPs=number_data$SNPs[43]) %>% filter(perc>=0.01)
+data_T8.mutect2 <- as.data.frame(fr.list[8]) %>% select(perc) %>% mutate(timepoint="T08",SNPs=number_data$SNPs[44]) %>% filter(perc>=0.01)
+
+
+# Get the perc columns for MIDAS (+)
+data_T1.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d9_s151) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T1.midas <- data_T1.midas %>% mutate(SNPs=nrow(data_T1.midas))
+
+n1.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d9_s151) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T2.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d45_s133) %>% mutate(timepoint="T02", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T2.midas <- data_T2.midas %>% mutate(SNPs=nrow(data_T2.midas))
+
+n2.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d45_s133) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T3.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d69_s91) %>% mutate(timepoint="T03", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T3.midas <- data_T3.midas %>% mutate(SNPs=nrow(data_T3.midas))
+
+n3.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d69_s91) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T4.midas <- as.data.frame(midas.data.id7$id_ref_allele_freq_id7_d105_s158) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T4.midas <- data_T4.midas %>% mutate(SNPs=nrow(data_T4.midas))
+
+n4.midas <- as.data.frame(midas.data.id7$id_ref_allele_freq_id7_d105_s158) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T5.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d128_s95) %>% mutate(timepoint="T05", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T5.midas <- data_T5.midas %>% mutate(SNPs=nrow(data_T5.midas))
+
+n5.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d128_s95) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T6.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d218_s144) %>% mutate(timepoint="T06", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T6.midas <- data_T6.midas %>% mutate(SNPs=nrow(data_T6.midas))
+
+n6.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d218_s144) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T7.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d249_s126) %>% mutate(timepoint="T07", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T7.midas <- data_T7.midas %>% mutate(SNPs=nrow(data_T7.midas))
+
+n7.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d249_s126) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T8.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d280_s98) %>% mutate(timepoint="T08", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T8.midas <- data_T8.midas %>% mutate(SNPs=nrow(data_T8.midas))
+
+n8.midas <- as.data.frame(midas.data.id7.f$id_ref_allele_freq_id7_d280_s98) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+# Merge the dataframes & get abundance information
+
+# first put all the data into a list
+df_list.id7.mutect2 <- list(data_T1.mutect2, data_T2.mutect2, data_T3.mutect2, data_T4.mutect2, data_T5.mutect2, data_T6.mutect2, data_T7.mutect2, data_T8.mutect2) # (+)
+
+df_list.id7.midas <- list(data_T1.midas, data_T2.midas, data_T3.midas, data_T4.midas, data_T5.midas, data_T6.midas, data_T7.midas, data_T8.midas)
+
+# then merge them into a new dataframe 
+merged_data_mutect2 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id7.mutect2) 
+merged_data_midas <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id7.midas) 
+
+# Write the data for later use
+write.csv(merged_data_mutect2, './data/SNPs_pre/snps_ID7_mutect2.csv')
+write.csv(merged_data_midas, './data/SNPs_pre/snps_ID7_midas.csv')
+
+```
+
+```{r}
+## ID8 ##
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID8_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[45]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[46]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[47]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[48]) %>% filter(perc>=0.01)
+
+```
+
+```{r}
+## ID9 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read all the vcf files of the current directory
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID09_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+for (i in 1:length(df.list)) {
+  data <- as.data.frame(fr.list[i]) %>% select(X.CHROM,POS,REF,ALT,perc)
+  file_name <- paste("./data/SNPs/sample", i, ".csv", sep = "")
+  write.csv(data, file_name)
+}
+
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[49]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[50]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[51]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[52]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[53]) %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[54]) %>% filter(perc>=0.01)
+data_T7.mutect2 <- as.data.frame(fr.list[7]) %>% select(perc) %>% mutate(timepoint="T07",SNPs=number_data$SNPs[55]) %>% filter(perc>=0.01)
+data_T8.mutect2 <- as.data.frame(fr.list[8]) %>% select(perc) %>% mutate(timepoint="T08",SNPs=number_data$SNPs[56]) %>% filter(perc>=0.01)
+data_T9.mutect2 <- as.data.frame(fr.list[9]) %>% select(perc) %>% mutate(timepoint="T09",SNPs=number_data$SNPs[57]) %>% filter(perc>=0.01)
+
+# Merge the dataframes & get abundance information
+
+# first put all the data into a list
+
+# then merge them into a new dataframe 
+df_list.id7.mutect2 <- list(data_T1.mutect2, data_T2.mutect2, data_T3.mutect2, data_T4.mutect2, data_T5.mutect2, data_T6.mutect2, data_T7.mutect2, data_T8.mutect2, data_T9.mutect2) # (+)
+merged_data_mutect2 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id7.mutect2) 
+
+# Write the data for later use
+write.csv(merged_data_mutect2, './data/SNPs_pre/snps_ID9_mutect2.csv')
+
+```
+
+```{r}
+## ID10 ##
+## Extract the # of SNPs information
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id10 <- read_csv("data/SNPs/102506.ID10.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id10.f <- midas.data.id10 %>% filter(passesMidasFilter==TRUE)
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID10_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[58]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[59]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[60]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[61]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[62]) %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[63]) %>% filter(perc>=0.01)
+
+# Get the # of SNPs for MIDAS
+n1.midas <- as.data.frame(midas.data.id10.f$id_ref_allele_freq_ID10_d52_s35) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n2.midas <- as.data.frame(midas.data.id10.f$id_ref_allele_freq_id10_d61_s147) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n3.midas <- as.data.frame(midas.data.id10.f$id_ref_allele_freq_id10_d96_s138) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n4.midas <- as.data.frame(midas.data.id10.f$id_ref_allele_freq_ID10_d108_s33) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n5.midas <- as.data.frame(midas.data.id10.f$id_ref_allele_freq_id10_d126_s127) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n6.midas <- as.data.frame(midas.data.id10.f$id_ref_allele_freq_id10_d269_s162) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+```
+
+```{r}
+## ID11 ##
+## Extract the # of SNPs information
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id11 <- read_csv("data/SNPs/102506.ID11.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id11.f <- midas.data.id11 %>% filter(passesMidasFilter==TRUE)
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID11_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[64]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[65]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[66]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[67]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[68]) %>% filter(perc>=0.01)
+
+# Get the # of SNPs for MIDAS
+n1.midas <- as.data.frame(midas.data.id11.f$id_ref_allele_freq_id11_d96_s111) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n2.midas <- as.data.frame(midas.data.id11.f$id_ref_allele_freq_ID11_d110_s65) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n3.midas <- as.data.frame(midas.data.id11.f$id_ref_allele_freq_ID11_d173_s168) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n4.midas <- as.data.frame(midas.data.id11.f$id_ref_allele_freq_ID11_d200_s169) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+n5.midas <- as.data.frame(midas.data.id11.f$id_ref_allele_freq_ID11_d281_s177) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+```
+
+
+```{r}
+## ID12 ##
+## Make the super-plot that shows allele frequencies, number of SNPs and abundance (per microorganism & individual overtime) ##
+
+# Read MIDAS data for e. coli & ID1
+midas.data.id12 <- read_csv("data/SNPs/102506.ID12.snp_info.csv")
+
+# Filter SNPs that don't pass Midas filter
+midas.data.id12.f <- midas.data.id12 %>% filter(passesMidasFilter==TRUE)
+
+# Read all the vcf files of the current directory
+
+# Then make a list of the names of the vcf files
+file.list <- list.files(path="./data/SNPs/", pattern = fixed("ID12_d"))
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Apply this function for the dataframes contained in the list
+fr.list <- lapply(df.list, freq_calc)
+
+# 4) Get the perc columns from the created list for each day (+)
+data_T1.mutect2 <- as.data.frame(fr.list[1]) %>% select(perc) %>% mutate(timepoint="T01",SNPs=number_data$SNPs[69]) %>% filter(perc>=0.01)
+data_T2.mutect2 <- as.data.frame(fr.list[2]) %>% select(perc) %>% mutate(timepoint="T02",SNPs=number_data$SNPs[70]) %>% filter(perc>=0.01)
+data_T3.mutect2 <- as.data.frame(fr.list[3]) %>% select(perc) %>% mutate(timepoint="T03",SNPs=number_data$SNPs[71]) %>% filter(perc>=0.01)
+data_T4.mutect2 <- as.data.frame(fr.list[4]) %>% select(perc) %>% mutate(timepoint="T04",SNPs=number_data$SNPs[72]) %>% filter(perc>=0.01)
+data_T5.mutect2 <- as.data.frame(fr.list[5]) %>% select(perc) %>% mutate(timepoint="T05",SNPs=number_data$SNPs[73]) %>% filter(perc>=0.01)
+data_T6.mutect2 <- as.data.frame(fr.list[6]) %>% select(perc) %>% mutate(timepoint="T06",SNPs=number_data$SNPs[74]) %>% filter(perc>=0.01)
+data_T7.mutect2 <- as.data.frame(fr.list[7]) %>% select(perc) %>% mutate(timepoint="T07",SNPs=number_data$SNPs[75]) %>% filter(perc>=0.01)
+data_T8.mutect2 <- as.data.frame(fr.list[8]) %>% select(perc) %>% mutate(timepoint="T08",SNPs=number_data$SNPs[76]) %>% filter(perc>=0.01)
+data_T9.mutect2 <- as.data.frame(fr.list[9]) %>% select(perc) %>% mutate(timepoint="T09",SNPs=number_data$SNPs[77]) %>% filter(perc>=0.01)
+
+# Merge the dataframes & get abundance information
+
+# Get the perc columns for MIDAS (+)
+data_T1.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d7_s21) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T1.midas <- data_T1.midas %>% mutate(SNPs=nrow(data_T1.midas))
+
+n1.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d7_s21) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T2.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d9_s62) %>% mutate(timepoint="T02", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T2.midas <- data_T2.midas %>% mutate(SNPs=nrow(data_T2.midas))
+
+n2.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d9_s62) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T3.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d13_s63) %>% mutate(timepoint="T03", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T3.midas <- data_T3.midas %>% mutate(SNPs=nrow(data_T3.midas))
+
+n3.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d13_s63) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T4.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d60_s86) %>% mutate(timepoint="T04", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T4.midas <- data_T4.midas %>% mutate(SNPs=nrow(data_T4.midas))
+
+n4.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d60_s86) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T5.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d75_s3) %>% mutate(timepoint="T05", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T5.midas <- data_T5.midas %>% mutate(SNPs=nrow(data_T5.midas))
+
+n5.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d75_s3) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T6.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d89_s96) %>% mutate(timepoint="T06", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T6.midas <- data_T6.midas %>% mutate(SNPs=nrow(data_T6.midas))
+
+n6.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d89_s96) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T7.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d150_s72) %>% mutate(timepoint="T07", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T7.midas <- data_T7.midas %>% mutate(SNPs=nrow(data_T7.midas))
+
+n7.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d150_s72) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T8.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d241_s101) %>% mutate(timepoint="T08", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T8.midas <- data_T8.midas %>% mutate(SNPs=nrow(data_T8.midas))
+
+n8.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_id12_d241_s101) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+data_T9.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d315_s160) %>% mutate(timepoint="T09", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99 & major.freq >= 0.01) %>% mutate(minor.freq=1-major.freq) %>% mutate(major.freq = ifelse(minor.freq > 0.5, minor.freq, major.freq)) %>% mutate(minor.freq=1-major.freq)
+data_T9.midas <- data_T9.midas %>% mutate(SNPs=nrow(data_T9.midas))
+
+n9.midas <- as.data.frame(midas.data.id12.f$id_ref_allele_freq_ID12_d315_s160) %>% mutate(timepoint="T01", Tool="MIDAS") %>% rename_with(~ "major.freq", .cols = 1) %>% filter(major.freq < 0.99)
+
+# first put all the data into a list
+df_list.id12.mutect2 <- list(data_T1.mutect2, data_T2.mutect2, data_T3.mutect2, data_T4.mutect2, data_T5.mutect2, data_T6.mutect2, data_T7.mutect2, data_T8.mutect2, data_T9.mutect2) # (+)
+
+df_list.id12.midas <- list(data_T1.midas, data_T2.midas, data_T3.midas, data_T4.midas, data_T5.midas, data_T6.midas, data_T7.midas, data_T8.midas, data_T9.midas)
+
+# then merge them into a new dataframe 
+merged_data_mutect2 <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id12.mutect2) 
+merged_data_midas <- Reduce(function(x, y) merge(x, y, all=TRUE), df_list.id12.midas) 
+
+# Write the data for later use
+write.csv(merged_data_mutect2, './data/SNPs_pre/snps_ID12_mutect2.csv')
+write.csv(merged_data_midas, './data/SNPs_pre/snps_ID12_midas.csv')
+
+```
+

@@ -1,0 +1,344 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=12, fig.height=4, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library("Biostrings")
+library(ape)
+library(readr)
+library(readxl)
+library(RColorBrewer)
+library(stringr)
+library(viridis)
+library(scales)
+library(cowplot)
+library(ggrepel)
+```
+
+```{r}
+## Read the data ##
+
+# Read the data with the SNPs number per sample per individual
+number_data1 <- read_xlsx("data/number_of_snps_e.coli.xlsx")
+number_data2 <- read_xlsx("data/number_of_snps_b.longum.xlsx")
+number_data3 <- read_xlsx("data/number_of_snps_p.dorei.xlsx")
+
+```
+
+```{r}
+# Preprocess the data
+
+# E. coli
+number_data1$mutect2.snps <- log10(number_data1$mutect2.snps)
+number_data1$midas.snps <- log10(number_data1$midas.snps)
+
+# B. longum
+number_data2$mutect2.snps <- log10(number_data2$mutect2.snps)
+number_data2$midas.snps <- log10(number_data2$midas.snps)
+
+# P. dorei
+number_data3$mutect2.snps <- log10(number_data3$mutect2.snps)
+number_data3$midas.snps <- log10(number_data3$midas.snps)
+
+# Help function to convert p-values 
+
+# Format p-values as numbers in the power of something
+format_p_value <- function(p_value) {
+  exp_value <- floor(log10(p_value))
+  base <- p_value / 10^exp_value
+  formatted_p <- sprintf("1e-%d", exp_value)
+  return(formatted_p)
+}
+```
+
+```{r}
+# Make scatter plots with a general/overall correlation of SNPs per genome per sample of both methods
+
+sca_e.coli <- ggplot(data=number_data1, mapping=aes(x=midas.snps, y=mutect2.snps)) + 
+  geom_point(col="#414487", size=2, alpha=0.6) + 
+  ylim(2,5) +
+  xlim(2,5) +
+  ylab("Mutect2 (log10-scaled number of SNPs)") +
+  xlab("Midas2 (log10-scaled number of SNPs)") +
+  ggtitle("E. coli") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+sca_b.longum <- ggplot(data=number_data2, mapping=aes(x=midas.snps, y=mutect2.snps)) + 
+  geom_point(col="#22a884", size=2, alpha=0.6) + 
+  ylim(2,5) +
+  xlim(2,5) +
+  ylab("") + 
+  xlab("Midas2 (log10-scaled number of SNPs)") +
+  ggtitle("B. longum") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+sca_p.dorei <- ggplot(data=number_data3, mapping=aes(x=midas.snps, y=mutect2.snps)) + 
+  geom_point(col="#7ad151", size=2, alpha=0.6) + 
+  ylim(2,5) +
+  xlim(2,5) +
+  ylab("") + 
+  xlab("Midas2 (log10-scaled number of SNPs)") +
+  ggtitle("P. dorei/vulgatus") +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+# Calculate correlation coefficients and p-values
+cor_coef_e.coli <- cor.test(number_data1$midas.snps, number_data1$mutect2.snps)
+cor_coef_b.longum <- cor.test(number_data2$midas.snps, number_data2$mutect2.snps)
+cor_coef_p.dorei <- cor.test(number_data3$midas.snps, number_data3$mutect2.snps)
+
+# Add correlation coefficients and p-values to the plots
+sca_e.coli <- sca_e.coli +
+  geom_text(data = data.frame(x = 3.5, y = 5, label = paste("Correlation:", round(cor_coef_e.coli$estimate, 2), "P-value:", "p<0.001")), aes(x = x, y = y, label = label)) 
+
+sca_b.longum <- sca_b.longum +
+  geom_text(data = data.frame(x = 3.5, y = 5, label = paste("Correlation:", round(cor_coef_b.longum$estimate, 2), "P-value:", "p=0.005")), aes(x = x, y = y, label = label)) 
+
+sca_p.dorei <- sca_p.dorei +
+  geom_text(data = data.frame(x = 3.5, y = 5, label = paste("Correlation:", round(cor_coef_p.dorei$estimate, 2), "P-value:", "p<0.001")), aes(x = x, y = y, label = label)) 
+
+tiff("scatter_plot.tiff", units="in", width=12, height=4, res=300)
+
+plot_grid(sca_e.coli, sca_b.longum, sca_p.dorei, nrow=1, rel_heights = c(1,1,1), labels = c("A", "B", "C"))
+
+dev.off()
+```
+
+```{r}
+# Preprocess the data
+number_data$Sample <- file.list.id
+number_data$Sample <- sub("_s.*", "", number_data$Sample)
+
+# Sort the data
+sorted.df <- number_data[order(number_data$Day, decreasing = FALSE), ]
+
+# Make a column that indicate if a sample surpases the coverage threshold
+sorted.df$th.coverage <- ifelse(sorted.df$Reads >= 5000000, "yes", "no")
+
+# Make the sample as a factor and create a color pallete
+sorted.df$Sample <- factor(sorted.df$Sample, levels = sorted.df$Sample)
+my_colors <- c("#64A6BD","#058ED9")
+
+```
+
+```{r}
+## Plot the correlation between MIDAS and mutect2 # of SNPs ##
+
+ggplot(data=number_data, aes(x=midas.snps,y=mutect2.snps)) + geom_point()
+```
+
+```{r}
+## Plot the data as barplot ##
+
+# Mutect2 plot
+mutect2 <- ggplot(data=sorted.df, aes(x = Sample, y = mutect2.snps)) +
+  geom_bar(aes(x = Sample, y = mutect2.snps,fill=th.coverage), stat="identity") + ylim(0,100000) +
+  scale_fill_manual(values = my_colors) +
+  ggtitle("Number of SNPs detected for E.coli overtime")  + 
+  theme_minimal() +
+  theme(plot.title=element_text(hjust = 0.5)) +
+  theme(legend.position="none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("SNPs") +
+  geom_segment(aes(x = 9.5, y = 0, xend = 9.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 12.5, y = 0, xend = 12.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 19.5, y = 0, xend = 19.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 25.5, y = 0, xend = 25.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 35.5, y = 0, xend = 35.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 39.5, y = 0, xend = 39.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 43.5, y = 0, xend = 43.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 49.5, y = 0, xend = 49.5, yend = 100000), color = "grey",size=1) + 
+  geom_segment(aes(x = 54.5, y = 0, xend = 54.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 56.5, y = 0, xend = 56.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 71.5, y = 0, xend = 71.5, yend = 100000), color = "grey",size=1)
+  
+
+# Midas plot
+midas <- ggplot(sorted.df, aes(x = Sample, y = midas.snps)) + 
+  geom_bar(stat="identity", fill="#C52233") + ylim(0,100000) + 
+  theme_minimal() + 
+  theme(legend.position="none", axis.title.x=element_blank(), axis.text.x=element_blank()) + ylab("SNPs") +
+  geom_segment(aes(x = 9.5, y = 0, xend = 9.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 12.5, y = 0, xend = 12.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 19.5, y = 0, xend = 19.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 25.5, y = 0, xend = 25.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 35.5, y = 0, xend = 35.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 39.5, y = 0, xend = 39.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 43.5, y = 0, xend = 43.5, yend = 100000), color = "grey",size=1)  +
+  geom_segment(aes(x = 49.5, y = 0, xend = 49.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 54.5, y = 0, xend = 54.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 56.5, y = 0, xend = 56.5, yend = 100000), color = "grey",size=1) +
+  geom_segment(aes(x = 71.5, y = 0, xend = 71.5, yend = 100000), color = "grey",size=1) 
+  
+
+# Coverage plot
+coverage <- ggplot(sorted.df, aes(x = Sample, y = Reads)) + geom_bar(stat="identity", fill="#037171") +  
+  theme_minimal() +
+  theme(legend.position="none", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + xlab("Sample") + ylab("Coverage (# of reads)") + 
+  geom_segment(aes(x = 0, y = 5000000, xend = 77, yend = 5000000), linetype="dashed", color = "black") +
+  geom_segment(aes(x = 9.5, y = 0, xend = 9.5, yend = 30000000), color = "grey",size=1)  +
+  geom_segment(aes(x = 12.5, y = 0, xend = 12.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 19.5, y = 0, xend = 19.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 25.5, y = 0, xend = 25.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 35.5, y = 0, xend = 35.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 39.5, y = 0, xend = 39.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 43.5, y = 0, xend = 43.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 49.5, y = 0, xend = 49.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 54.5, y = 0, xend = 54.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 56.5, y = 0, xend = 56.5, yend = 30000000), color = "grey",size=1) +
+  geom_segment(aes(x = 71.5, y = 0, xend = 71.5, yend = 30000000), color = "grey",size=1) +
+  geom_point(aes(x = Sample, y=-0.5, col=Day))
+
+plot_grid(mutect2, midas, coverage, nrow=3, rel_heights = c(1,1,1))
+
+```
+
+```{r}
+# Create a column which indicates the time window 
+number_data_n <- number_data1 %>% mutate(time_window = "empty") %>% mutate(time_window = ifelse(Day <= 30, "01-mon", ifelse(Day > 30 & Day <=60, "02-mon", ifelse(Day > 60 & Day <=90, "03-mon", ifelse(Day > 90 & Day <=120, "04-mon", ifelse(Day > 120 & Day <=150, "05-mon", ifelse(Day > 150 & Day <=180, "06-mon", ifelse(Day > 180 & Day <=210, "07-mon", ifelse(Day > 210 & Day <=240, "08-mon", ifelse(Day > 240 & Day <=270, "09-mon", ifelse(Day > 270 & Day <=300, "10-mon", ifelse(Day > 300 & Day <=330, "11-mon", ifelse(Day > 330 & Day <=365, "12-mon", time_window)))))))))))))
+
+```
+
+```{r}
+## Plot the data as barplot ##
+
+# Get the number of the data points per tool
+summary_data_mutect2 <- number_data_n %>% group_by(time_window) %>% summarise(number_of_points = n())
+summary_data_midas <- number_data_n %>% filter(!is.na(midas.snps)) %>% group_by(time_window) %>% summarise(number_of_points = n())
+
+# Define a vector of custom x-axis labels
+custom_labels_mutect2 <- paste("n = ", sep = "", summary_data_mutect2$number_of_points)
+custom_labels_midas <- paste("n = ", sep = "", summary_data_midas$number_of_points)
+
+mutect2 <- ggplot(data=number_data_n, aes(x = time_window, y = mutect2.snps)) +
+  geom_boxplot(fill="#3b528b") +
+  ggtitle("E.coli") +
+  theme_minimal() +
+  theme(plot.title=element_text(hjust = 0.5)) +
+  scale_x_discrete(labels = custom_labels_mutect2) +
+  theme(legend.position="none", axis.title.x=element_blank()) + ylab("Mutect2 (SNPs)")
+
+midas <- ggplot(data=number_data_n, aes(x = time_window, y = midas.snps)) + 
+  geom_boxplot(fill="#472d7b") +
+  theme_minimal() +
+  scale_x_discrete(labels = custom_labels_midas) +
+  theme(legend.position="none", axis.title.x=element_blank()) + ylab("MIDAS2 (SNPs)")
+
+coverage <- ggplot(data=number_data_n, aes(x = time_window, y = Reads)) + geom_boxplot(fill="#037171") +  
+  theme_minimal() + xlab("Time") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("Coverage (reads)")
+
+p1 <- plot_grid(mutect2, midas, coverage, nrow=3, rel_heights = c(1,1,1))
+
+
+```
+```{r}
+# Create a column which indicates the time window 
+number_data_n <- number_data2 %>% mutate(time_window = "empty") %>% mutate(time_window = ifelse(Day <= 30, "01-mon", ifelse(Day > 30 & Day <=60, "02-mon", ifelse(Day > 60 & Day <=90, "03-mon", ifelse(Day > 90 & Day <=120, "04-mon", ifelse(Day > 120 & Day <=150, "05-mon", ifelse(Day > 150 & Day <=180, "06-mon", ifelse(Day > 180 & Day <=210, "07-mon", ifelse(Day > 210 & Day <=240, "08-mon", ifelse(Day > 240 & Day <=270, "09-mon", ifelse(Day > 270 & Day <=300, "10-mon", ifelse(Day > 300 & Day <=330, "11-mon", ifelse(Day > 330 & Day <=365, "12-mon", time_window)))))))))))))
+
+```
+
+```{r}
+## Plot the data as barplot ##
+
+# Get the number of the data points per tool
+summary_data_mutect2 <- number_data_n %>% group_by(time_window) %>% summarise(number_of_points = n())
+summary_data_midas <- number_data_n %>% filter(!is.na(midas.snps)) %>% group_by(time_window) %>% summarise(number_of_points = n())
+
+# Create a new row with specific values
+new_row <- data.frame(time_window = "08-mon",
+                      number_of_points = 0)
+
+# Add the new row to the dataframe
+summary_data_midas <- rbind(summary_data_midas, new_row)
+# Sort the data
+summary_data_midas <- summary_data_midas[order(summary_data_midas$time_window, decreasing = FALSE), ]
+
+# Define a vector of custom x-axis labels
+custom_labels_mutect2 <- paste("n = ", sep = "", summary_data_mutect2$number_of_points)
+custom_labels_midas <- paste("n = ", sep = "", summary_data_midas$number_of_points)
+
+mutect2 <- ggplot(data=number_data_n, aes(x = time_window, y = mutect2.snps)) +
+  geom_boxplot(fill="#28ae80") +
+  ggtitle("B. longum") +
+  theme_minimal() +
+  theme(plot.title=element_text(hjust = 0.5)) +
+  scale_x_discrete(labels = custom_labels_mutect2) +
+  theme(legend.position="none", axis.title.x=element_blank()) + ylab("")
+
+midas <- ggplot(data=number_data_n, aes(x = time_window, y = midas.snps)) + 
+  geom_boxplot(fill="#21918c") +
+  theme_minimal() +
+  scale_x_discrete(labels = custom_labels_midas) +
+  theme(legend.position="none", axis.title.x=element_blank()) + ylab("")
+
+coverage <- ggplot(data=number_data_n, aes(x = time_window, y = Reads)) + geom_boxplot(fill="#037171") +  
+  theme_minimal() + xlab("Time") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("")
+
+p2 <- plot_grid(mutect2, midas, coverage, nrow=3, rel_heights = c(1,1,1))
+
+
+```
+
+```{r}
+# Create a column which indicates the time window 
+number_data_n <- number_data3 %>% mutate(time_window = "empty") %>% mutate(time_window = ifelse(Day <= 30, "01-mon", ifelse(Day > 30 & Day <=60, "02-mon", ifelse(Day > 60 & Day <=90, "03-mon", ifelse(Day > 90 & Day <=120, "04-mon", ifelse(Day > 120 & Day <=150, "05-mon", ifelse(Day > 150 & Day <=180, "06-mon", ifelse(Day > 180 & Day <=210, "07-mon", ifelse(Day > 210 & Day <=240, "08-mon", ifelse(Day > 240 & Day <=270, "09-mon", ifelse(Day > 270 & Day <=300, "10-mon", ifelse(Day > 300 & Day <=330, "11-mon", ifelse(Day > 330 & Day <=365, "12-mon", time_window)))))))))))))
+
+```
+
+```{r}
+## Plot the data as barplot ##
+
+# Get the number of the data points per tool
+summary_data_mutect2 <- number_data_n %>% group_by(time_window) %>% summarise(number_of_points = n())
+summary_data_midas <- number_data_n %>% filter(!is.na(midas.snps)) %>% group_by(time_window) %>% summarise(number_of_points = n())
+
+
+# Define a vector of custom x-axis labels
+custom_labels_mutect2 <- paste("n = ", sep = "", summary_data_mutect2$number_of_points)
+custom_labels_midas <- paste("n = ", sep = "", summary_data_midas$number_of_points)
+
+mutect2 <- ggplot(data=number_data_n, aes(x = time_window, y = mutect2.snps)) +
+  geom_boxplot(fill="#fde725") +
+  ggtitle("P. dorei") +
+  theme_minimal() +
+  theme(plot.title=element_text(hjust = 0.5)) +
+  scale_x_discrete(labels = custom_labels_mutect2) +
+  theme(legend.position="none", axis.title.x=element_blank()) + ylab("")
+
+midas <- ggplot(data=number_data_n, aes(x = time_window, y = midas.snps)) + 
+  geom_boxplot(fill="#addc30") +
+  theme_minimal() +
+  scale_x_discrete(labels = custom_labels_midas) +
+  theme(legend.position="none", axis.title.x=element_blank()) + ylab("")
+
+coverage <- ggplot(data=number_data_n, aes(x = time_window, y = Reads)) + geom_boxplot(fill="#037171") +  
+  theme_minimal() + xlab("Time") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("Reads")
+
+p3 <- plot_grid(mutect2, midas, coverage, nrow=3, rel_heights = c(1,1,1))
+
+```
+
+```{r}
+
+tiff("number_comps.tiff", units="in", width=16, height=7, res=300)
+
+plot_grid(p1, p2, p3, nrow = 1, labels = c("A", "B", "C"))
+
+dev.off()
+
+
+```
+
