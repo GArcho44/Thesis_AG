@@ -1,6 +1,8 @@
 # Metagenomics project
 ## Functional consequences of genomic and single nucleotide variation in infant gut microbiome time series 
 
+![Alt Text](Image URL)
+
 ### Abstract 
 
 In this study, we explore the intricate dynamics of microbial succession within the infant gut microbiome during the first year
