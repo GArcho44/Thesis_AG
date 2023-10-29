@@ -1,7 +1,7 @@
 # Metagenomics project
 ## Functional consequences of genomic and single nucleotide variation in infant gut microbiome time series 
 
-![front_page](https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true)
+
 
 ### Abstract 
 
@@ -29,6 +29,8 @@ addressing metagenotyping challenges and opening the path to
 Ultra-Resolution Metagenomics (URM), this study contributes to a
 deeper understanding of microbial community evolution and development during this critical period, with implications for long-term
 health.
+
+![front_page](https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true)
 
 ### Information
 All the scripts that being used for the metagenomics project are provided.
