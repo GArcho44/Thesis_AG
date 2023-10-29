@@ -1,0 +1,182 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=10, fig.height=8, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library("Biostrings")
+library(ape)
+library(readr)
+library(readxl)
+library(RColorBrewer)
+library(stringr)
+library(viridis)
+library(scales)
+library(cowplot)
+library(glmnet)
+```
+
+```{r}
+## Read the data ##
+
+# E. coli
+e.coli.cog <- read.csv("../data/E.coli/E.coli_COG_norm.csv", row.names = 1)
+e.coli.kegg <- read.csv("../data/E.coli/E.coli_KEGG_norm.csv", row.names = 1)
+number_data <- read_xlsx("../data/E.coli/number_of_snps.xlsx")
+
+# B. longum
+b.longum.cog <- read.csv("../data/B.longum/B.longum_COG_norm.csv", row.names = 1)
+b.longum.kegg <- read.csv("../data/B.longum/B.longum_KEGG_norm.csv", row.names = 1)
+number_data <- read_xlsx("../data/B.longum/number_of_snps.xlsx")
+
+# P. dorei
+p.dorei.cog <- read.csv("../data/P.dorei/P.dorei_COG_norm.csv", row.names = 1)
+p.dorei.kegg <- read.csv("../data/P.dorei/P.dorei_KEGG_norm.csv", row.names = 1)
+number_data <- read_xlsx("../data/P.dorei/number_of_snps.xlsx")
+
+```
+
+```{r}
+## Perform ANOVA using various predictor variables
+
+# 1) Does number of SNPs predict timepoint?
+model.1 <- lm(Day ~ SNPs, data=number_data)
+anova(model.1)
+summary(model.1)
+?lm()
+# The anova shows that the variable Day leads to a significant reduction in the residual sum of squares as indicated by the corresponding F-statistic and p-value
+
+# 2) Does number of SNPs predict individual?
+model.2 <- lm(Individual ~ SNPs, data=number_data)
+anova(model.2)
+summary(model.2)
+
+# 3) Does number of reads predict timepoint?
+model.3 <- lm(Day ~ Reads, data=number_data)
+anova(model.3)
+summary(model.3)
+
+
+# 4) Does number of reads predict timepoint?
+model.4 <- lm(SNPs ~ Reads, data=number_data)
+results <- anova(model.4)
+
+
+ggplot(data=number_data, mapping = aes(x=SNPs,y=Reads)) + geom_point()
+
+summary(model.4)
+
+```
+
+```{r}
+## Linear models of SNPs data for E. coli
+
+# Process the data
+b.longum.kegg <- as.data.frame(t(b.longum.kegg))
+b.longum.kegg$Day <- as.numeric(gsub(".*_d","",rownames(b.longum.kegg)))
+
+## Make a model using as predictor variables the SNPs in COG terms and as response variable the timepoints
+
+p.values <- c()
+f.values <- c()
+
+for (i in colnames(b.longum.kegg)) {
+  
+  # create a model using only one predictor variable
+  model.df <- b.longum.kegg %>% select(all_of(i), Day)
+  model.tp <- lm(Day ~ ., data=model.df)
+  
+  # store the results of F-statistic and p-value and store them into corresponding variables
+  results <- anova(model.tp)
+  p.value <- results$`Pr(>F)`[1]
+  p.values <- append(p.values, p.value)
+  f.statistic <- results$`F value`[1]
+  f.values <- append(f.values,f.statistic)
+  }
+```
+
+```{r}
+## Plot the p-values ##
+
+# Process the data
+p.values <- as.data.frame(p.values, colnames(b.longum.kegg
+                                             ))
+p.values <- p.values %>% filter(!is.na(p.values))
+
+f.values <- as.data.frame(f.values, colnames(b.longum.kegg))
+f.values <- f.values %>% filter(!is.na(f.values))
+
+# Create a vector to store the p-values
+p.values.v <- p.values$p.values
+nbins <- 100
+bins <- hist(p.values.v, nclass=nbins, col='grey50', main = 'p-value histogram')
+```
+
+```{r}
+## Multiple hypothesis testing ##
+null.bins <- bins$breaks[-1] > 0.3
+null.level <- sum(bins$counts[null.bins])/sum(null.bins)
+plot(bins, col='grey50', main = 'p-value histogram')
+abline(a=null.level,b=0,col='red',lwd=1)
+fdr.05 <- null.level*nbins*0.0035/sum(p.values.v <= 0.0035)
+
+
+pvalue.cutoff <- seq(1/nbins, 1, by=1/nbins)
+fdr <- vector(mode="numeric",length=length(pvalue.cutoff))
+for (i in seq_along(pvalue.cutoff)) {
+  fdr[i] <- null.level*(pvalue.cutoff[i]*nbins)/sum(p.values.v <= pvalue.cutoff[i])
+}
+plot(pvalue.cutoff, fdr, xlab='p-value cut-off', ylab='FDR', ylim=c(0,1.2))
+title('FDR and p-value relationship')
+
+p.values.sig <- p.values %>% filter(p.values<=0.001)
+
+```
+
+```{r}
+## Logistic Regression ##
+
+# Normalize each variable, i.e. subtract the mean of that variable and divide by its standard deviation. 
+x_scaled <- as.data.frame(scale(t(e.coli.cog)), center=TRUE, scale=TRUE)
+x_scaled$Day <- as.numeric(gsub(".*_d","",rownames(x_scaled)))
+
+# Split the data in half, one test set and one training set
+train.selection <- 1:nrow(x_scaled) %in% sample.int(nrow(x_scaled), size=nrow(x_scaled)%/%2)
+train <- x_scaled[train.selection,]
+train.x <- train %>% select(-Day) %>% as.matrix()
+train.y <- train$Day
+test <- x_scaled[!train.selection,]
+test.x <- test %>% select(-Day) %>% as.matrix()
+test.y <- test$Day
+
+# Fit the data using the glmnet() function
+lasso.model <- glmnet(x=train.x, y=train.y, alpha=1)
+ridge.model <- glmnet(x=train.x, y=train.y, alpha=0)
+plot(lasso.model, xvar="lambda")
+plot(ridge.model, xvar="lambda")
+
+c(cv.ridge$lambda.1se, cv.lasso$lambda.1se)
+
+# Perform CV
+cv.ridge <- cv.glmnet(x=train.x, y=train.y, alpha=0)
+cv.lasso <- cv.glmnet(x=train.x, y=train.y, alpha=1)
+plot(cv.ridge)
+plot(cv.lasso)
+summary(lasso.model)$r.squared
+
+ridge=predict(, newx = test.x)[,1]
+
+```
+

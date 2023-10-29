@@ -1,0 +1,226 @@
+---
+title: "SNP.script.1"
+author: "Archontis Goumagias"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=10, fig.height=8, out.width='100%', out.height='50%', fig.align='center')
+```
+
+```{r}
+# Load appropriate libraries
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library("Biostrings")
+library(ape)
+library(readr)
+library(readxl)
+library(RColorBrewer)
+library(stringr)
+library(viridis)
+library(scales)
+library(cowplot)
+```
+
+```{r}
+## Read the data ##
+
+# Get the list of the SNP data
+file.list <- list.files(path="./data/E.coli/SNPs/", pattern = fixed(".vcf"))
+
+# Get the list of the annotation data
+file.list.ano <- list.files(path="./data/E.coli/annotations", pattern = fixed(".gff"))
+
+# help functions for reading multiple data
+read_vcf <- function(data) {
+  fread(file=paste("./data/E.coli/SNPs/", data, sep=""), sep='\t', header = TRUE, skip = '#CHROM')
+}
+
+read_gff <- function(data) {
+  read.gff(file=paste("./data/E.coli/annotations/", data, sep=""))
+}
+
+# Then apply the read function to each file
+df.list <- lapply(file.list, read_vcf)
+
+# Read the functional annotation data
+df.list.ano <- lapply(file.list.ano, read_gff)
+```
+
+```{r}
+
+df_test <- df.list[[1]]
+df_ano  <- df.list.ano[[1]] %>% mutate(kegg="EMPTY")
+
+Processing_func_kegg <- function(data, annotation) {
+  colnames(data)[1]<- "CONTIG"
+  data <- data %>% select(CONTIG,POS,ID,REF,ALT)
+  
+  # Filter gene annotations for the SNPs called
+  colnames(annotation)[1]<- "CONTIG"
+  snp_con_list <- as.vector(data$CONTIG)
+  func_snp <- annotation %>% filter(CONTIG %in% snp_con_list) %>% full_join(data, by="CONTIG") %>% mutate(ok = POS >= start & POS <= end) %>% filter(ok==TRUE) %>% mutate(length=end-start+1) 
+  
+  # Keep only the COG attribute
+  func_snp$kegg <-  sub(".*kegg_ko=", "", func_snp$attribute)
+  func_snp$kegg <-  sub(";.*", "", func_snp$kegg)
+  
+  return(func_snp)
+}
+
+df_test.new <- Processing_func_kegg(df_test, df_ano)
+
+```
+
+```{r}
+## Filtering ##
+
+# Some processing
+df_test <- df_test.new %>% mutate(position="EMPTY")
+
+# Filtering function #
+
+filtering_func <- function(data) {
+  for (i in 1:dim(data)[1])  {
+
+    # Check if the gene is complete
+    if (data$attributes[i]=="00") {
+      # If the sense of the strand is "+" then:
+      if (data$strand[i]=="+") {
+        
+        # make a list of all the 3rd positions of the corresponding gene
+        positions <- seq(data$start[i] + 5, data$end[i] - 3, by=3)
+    
+      # Check if the position of SNP is inside this list
+      if (data$POS[i] %in% positions) {
+            data$position[i] <- "YES"
+            
+          } else {
+            data$position[i] <- "NO"
+            
+            }
+      } else {
+      
+        # make a list of all the 3rd positions of the corresponding gene
+        positions <- seq(data$end[i] - 5, data$start[i] + 3, by=-3)
+          
+        if (data$POS[i] %in% positions) {
+            data$position[i] <- "YES"
+            
+          } else {
+            data$position[i] <- "NO"
+          }
+        }
+      }
+        
+      if (data$attributes[i]=="01") {
+      # If the sense of the strand is "+" then:
+      if (data$strand[i]=="+") {
+        
+        # make a list of all the 3rd positions of the corresponding gene
+        positions <- seq(data$start[i] + 5, data$end[i], by=3)
+    
+      # Check if the position of SNP is inside this list
+      if (data$POS[i] %in% positions) {
+            data$position[i] <- "YES"
+            
+          } else {
+            data$position[i] <- "NO"
+            
+            }
+      } else {
+      
+        # make a list of all the 3rd positions of the corresponding gene
+        positions <- seq(data$end[i] - 2, data$start[i] + 5, by=-3)
+          
+        if (data$POS[i] %in% positions) {
+            data$position[i] <- "YES"
+            
+          } else {
+            data$position[i] <- "NO"
+          }
+        }
+      }
+        
+      if (data$attributes[i]=="10") {
+      # If the sense of the strand is "+" then:
+      if (data$strand[i]=="+") {
+        
+        # make a list of all the 3rd positions of the corresponding gene
+        positions <- seq(data$start[i] + 5, data$end[i], by=3)
+    
+      # Check if the position of SNP is inside this list
+      if (data$POS[i] %in% positions) {
+            data$position[i] <- "YES"
+            
+          } else {
+            data$position[i] <- "NO"
+            
+            }
+      } else {
+      
+        # make a list of all the 3rd positions of the corresponding gene
+        positions <- seq(data$end[i] - 2, data$start[i] + 5, by=-3)
+          
+        if (data$POS[i] %in% positions) {
+            data$position[i] <- "YES"
+            
+          } else {
+            data$position[i] <- "NO"
+          }
+        }
+      }
+  }
+  return(data)
+}
+
+        
+```
+
+```{r}
+# Apply the function #
+
+new_df <- filtering_func(df_test)
+
+```
+
+```{r}
+## Read the data ##
+sequences <- readDNAStringSet("./data/E.coli/contigs.fasta")
+
+## Make the codons for each SNP
+
+# Filter the positions that are in the 3rd position & create empty columns for codon, aa.1 and aa.2s
+codon_df <- new_df %>% filter(position=='YES') %>% mutate(codon="EMPTY") %>% mutate(aa.1="EMPTY") %>% mutate(aa.2="EMPTY")
+
+# Make a list of codons 
+
+codon_func <- function(data) {
+  for (i in 1:dim(data)[1]) {
+
+  data$codon[i] <- paste(as.character(sequences[[which(sequences@ranges@NAMES == data$CONTIG[i])]][data$POS[i]-2]), as.character(sequences[[which(sequences@ranges@NAMES == data$CONTIG[i])]][data$POS[i]- 1]), as.character(sequences[[which(sequences@ranges@NAMES == data$CONTIG[i])]][data$POS[i]]), sep="")
+  
+
+  }
+  return(data)
+}
+
+new_codon_df <- codon_func(codon_df)
+
+new_codon_df$new.codon <- with(new_codon_df, paste0(substr(new_codon_df$codon,1,2), new_codon_df$ALT))
+  for (i in 1:dim(new_codon_df)[1]) {
+    new_codon_df$aa.1[i] <- as.character(translate(DNAString(new_codon_df$codon[i])))
+    new_codon_df$aa.2[i] <- as.character(translate(DNAString(new_codon_df$new.codon[i])))
+    
+  }
+
+# Isolate SNPs that cause non-synonymous change
+final_df <- new_codon_df %>% filter(aa.1!=aa.2)
+
+```
+
