@@ -1,7 +1,7 @@
 # Metagenomics project
 ## Functional consequences of genomic and single nucleotide variation in infant gut microbiome time series 
 
-![Alt Text](Image URL)
+![front_page](https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true)
 
 ### Abstract 
 
