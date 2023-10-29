@@ -22,7 +22,7 @@ patterns in B. longum abundance correlating with the introduction of solid food.
 highlights mutations in these species, along with temporal strain
 replacement events. Lastly, potential functional consequences of
 these changes are assessed and reveal that genes associated with
-multi-drug resistance being affected. Additionally, the comparison between reference genome-based (MIDAS2) and metagenome-assembled genome-based (Mutect2) SNP calling methods underscores Mutect2’s advantages in detecting within-sample SNPs. By
+multi-drug resistance being affected. Additionally, the comparison between reference genome-based (MIDAS2) and metagenome-assembled genome-based (Mutect2) SNP calling methods underscores Mutect2’s advantages in detecting within-sample SNPs. By
 addressing metagenotyping challenges and opening the path to
 Ultra-Resolution Metagenomics (URM), this study contributes to a
 deeper understanding of microbial community evolution and development during this critical period, with implications for long-term
