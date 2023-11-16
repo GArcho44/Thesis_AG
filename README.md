@@ -26,6 +26,7 @@ All the scripts that being used for the metagenomics project are provided.
 
 <p align="center">
 <img src="https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true" width=50% height=50%>
+</p>
 
 A.G.
 
