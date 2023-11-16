@@ -30,7 +30,7 @@ Ultra-Resolution Metagenomics (URM), this study contributes to a
 deeper understanding of microbial community evolution and development during this critical period, with implications for long-term
 health.
 
-![front_page](https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true){: width="100" height="100"}
+![front_page](https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true){: width="50" height="50"}
 
 ### Information
 All the scripts that being used for the metagenomics project are provided.
