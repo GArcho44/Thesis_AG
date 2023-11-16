@@ -11,8 +11,6 @@
 
 3) Our optimized HRM SNP calling workflow, validated with de novo-reconstructed genomes, highlights temporal strain replacement events and mutations in crucial species, with potential functional consequences such as the impact on genes associated with multi-drug resistance. This study contributes to a deeper understanding of microbial community evolution during this critical period, paving the way for Ultra-Resolution Metagenomics (URM) and offering insights with implications for long-term health.
 
-![front_page](https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true)
-
 <img src="https://github.com/GArcho44/Thesis_AG/blob/main/fron_page_new.png?raw=true" width=50% height=50%>
 
 ### Information
