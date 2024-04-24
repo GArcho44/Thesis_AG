@@ -12,7 +12,7 @@
 3) Our optimized HRM SNP calling workflow, validated with de novo-reconstructed genomes, highlights temporal strain replacement events and mutations in crucial species, with potential functional consequences such as the impact on genes associated with multi-drug resistance. This study contributes to a deeper understanding of microbial community evolution during this critical period, paving the way for Ultra-Resolution Metagenomics (URM) and offering insights with implications for long-term health.
 
 ### Information
-All the scripts that being used for the metagenomics project are provided.
+All the scripts that have being used for the metagenomics project are provided.
 
 ### Chapter 1 - SNPs calling validation (2.4/3.1)*
 
